@@ -41,19 +41,6 @@ st.set_page_config(
 CHANGE_COLS = ["% 1d", "% 1w", "% 4w", "% 13w", "% 26w", "% 52w"]
 
 
-def find_universe_csv() -> Path | None:
-    """The CSV may sit in data/ or at the repo root, and the name has spaces."""
-    candidates = list(DATA_DIR.glob("*.csv")) + list(ROOT.glob("*.csv"))
-    for path in candidates:
-        try:
-            head = pd.read_csv(path, nrows=1)
-        except Exception:
-            continue
-        if {"Symbol", "Sector", "Industry"}.issubset({c.strip() for c in head.columns}):
-            return path
-    return None
-
-
 # --------------------------------------------------------------------------
 # Data loading (two-tier cache: resource for the session, data for frames)
 # --------------------------------------------------------------------------
@@ -61,11 +48,6 @@ def find_universe_csv() -> Path | None:
 @st.cache_resource
 def get_session():
     return core.make_session()
-
-
-@st.cache_data(show_spinner=False)
-def get_universe(csv_path: str, mtime: float) -> pd.DataFrame:
-    return core.load_universe(csv_path)
 
 
 @st.cache_data(show_spinner=False)
@@ -77,9 +59,9 @@ def get_snapshot(path: str, mtime: float) -> pd.DataFrame:
 
 
 @st.cache_data(ttl=60 * 60, show_spinner=False)
-def fetch_live(csv_path: str, mtime: float, days: int) -> pd.DataFrame:
+def fetch_live(csv_path: str, mtime: float, days: int) -> tuple[pd.DataFrame, list[str]]:
     """Live pull. Cached for an hour so a rerun does not re-download."""
-    universe = core.load_universe(csv_path)
+    universe, skipped = core.load_universe(csv_path)
     symbols = universe["Symbol"].tolist()
 
     bar = st.progress(0.0, text="Contacting Yahoo Finance…")
@@ -94,28 +76,31 @@ def fetch_live(csv_path: str, mtime: float, days: int) -> pd.DataFrame:
         progress_cb=on_progress,
     )
     bar.empty()
-    return core.build_metrics_frame(universe, frames)
+    return core.build_metrics_frame(universe, frames), skipped
 
 
-def load_data(csv_path: Path) -> tuple[pd.DataFrame, str]:
-    """Returns (frame, source_label)."""
+def load_data(csv_path: Path) -> tuple[pd.DataFrame, str, list[str]]:
+    """Returns (frame, source_label, csv_warnings)."""
     if SNAPSHOT.exists():
         df = get_snapshot(str(SNAPSHOT), SNAPSHOT.stat().st_mtime)
         stamp = "unknown"
+        csv_warnings: list[str] = []
         if SNAPSHOT_META.exists():
             try:
-                stamp = json.loads(SNAPSHOT_META.read_text()).get("built_at", "unknown")
+                meta = json.loads(SNAPSHOT_META.read_text())
+                stamp = meta.get("built_at", "unknown")
+                csv_warnings = meta.get("csv_warnings", [])
             except Exception:
                 pass
-        return df, f"Snapshot built {stamp}"
+        return df, f"Snapshot built {stamp}", csv_warnings
 
     st.info(
         "No snapshot found, so prices will be pulled live. The first load takes "
         "a few minutes for the full universe.",
         icon="⏳",
     )
-    df = fetch_live(str(csv_path), csv_path.stat().st_mtime, core.DEFAULT_HISTORY_DAYS)
-    return df, f"Live pull {datetime.now(timezone.utc):%Y-%m-%d %H:%M UTC}"
+    df, skipped = fetch_live(str(csv_path), csv_path.stat().st_mtime, core.DEFAULT_HISTORY_DAYS)
+    return df, f"Live pull {datetime.now(timezone.utc):%Y-%m-%d %H:%M UTC}", skipped
 
 
 # --------------------------------------------------------------------------
@@ -154,14 +139,26 @@ def ticker_column_config() -> dict:
 # Sidebar filters
 # --------------------------------------------------------------------------
 
-def sidebar_filters(df: pd.DataFrame) -> tuple[pd.DataFrame, str]:
+def sidebar_filters(df: pd.DataFrame) -> tuple[pd.DataFrame, str | None]:
     st.sidebar.header("Filters")
+
+    available_change_cols = [c for c in CHANGE_COLS if c in df.columns]
+    if not available_change_cols:
+        st.sidebar.warning("No price data loaded yet — filters are limited.")
+        search = st.sidebar.text_input("Search ticker or company", placeholder="e.g. AEHR")
+        out = df.copy()
+        if search.strip():
+            q = search.strip().lower()
+            out = out[
+                out["Symbol"].str.lower().str.contains(q, na=False)
+                | out["Company Name"].str.lower().str.contains(q, na=False)
+            ]
+        return out, None
 
     change_col = st.sidebar.selectbox(
         "Performance window",
-        [c for c in CHANGE_COLS if c in df.columns],
-        index=[c for c in CHANGE_COLS if c in df.columns].index("% 4w")
-        if "% 4w" in df.columns else 0,
+        available_change_cols,
+        index=available_change_cols.index("% 4w") if "% 4w" in available_change_cols else 0,
         help="Drives the sliders below and the sector / industry rankings.",
     )
 
@@ -274,7 +271,7 @@ def sidebar_filters(df: pd.DataFrame) -> tuple[pd.DataFrame, str]:
 # Views
 # --------------------------------------------------------------------------
 
-def ticker_view(df: pd.DataFrame, change_col: str) -> None:
+def ticker_view(df: pd.DataFrame, change_col: str | None) -> None:
     st.subheader("Tickers")
 
     display_cols = [
@@ -286,7 +283,10 @@ def ticker_view(df: pd.DataFrame, change_col: str) -> None:
     ]
     display_cols = [c for c in display_cols if c in df.columns]
 
-    view = df[display_cols].sort_values(change_col, ascending=False, na_position="last")
+    if change_col and change_col in df.columns:
+        view = df[display_cols].sort_values(change_col, ascending=False, na_position="last")
+    else:
+        view = df[display_cols].sort_values("Symbol")
 
     st.dataframe(
         view,
@@ -303,7 +303,7 @@ def ticker_view(df: pd.DataFrame, change_col: str) -> None:
         mime="text/csv",
     )
 
-    if len(view) and change_col in view.columns:
+    if len(view) and change_col and change_col in view.columns:
         left, right = st.columns(2)
         top = view.nlargest(15, change_col)[["Symbol", change_col]]
         bottom = view.nsmallest(15, change_col)[["Symbol", change_col]]
@@ -315,8 +315,12 @@ def ticker_view(df: pd.DataFrame, change_col: str) -> None:
             st.bar_chart(bottom.set_index("Symbol"), horizontal=True)
 
 
-def group_view(df: pd.DataFrame, level: str, change_col: str) -> None:
+def group_view(df: pd.DataFrame, level: str, change_col: str | None) -> None:
     st.subheader(level)
+
+    if not change_col:
+        st.info("No price data loaded yet, so there's nothing to rank by.")
+        return
 
     agg = core.aggregate(df, level, change_col)
     if agg.empty:
@@ -358,19 +362,33 @@ def group_view(df: pd.DataFrame, level: str, change_col: str) -> None:
 def main() -> None:
     st.title("📈 EasyEquities USD Screener")
 
-    csv_path = find_universe_csv()
+    csv_path, notes = core.find_universe_csv(ROOT, DATA_DIR)
     if csv_path is None:
         st.error(
             "Could not find the universe CSV. Expected a file with Symbol, "
             "Sector and Industry columns in data/ or the repo root."
         )
+        if notes:
+            with st.expander("Why", expanded=True):
+                for n in notes:
+                    st.write("•", n)
         st.stop()
 
-    df, source = load_data(csv_path)
+    df, source, csv_warnings = load_data(csv_path)
 
     if "Close" not in df.columns:
         st.error("The loaded data has no price columns. Rebuild the snapshot.")
         st.stop()
+
+    if csv_warnings:
+        with st.expander(f"⚠️ {len(csv_warnings)} row(s) in the CSV needed attention", expanded=False):
+            st.caption(
+                "Usually an unquoted comma inside Company Name (e.g. \"Smith, Jones & Co\") "
+                "throws off the column count for that line. Wrap the name in quotes in the "
+                "CSV to fix it permanently."
+            )
+            for w in csv_warnings:
+                st.write("•", w)
 
     filtered, change_col = sidebar_filters(df)
 
@@ -379,7 +397,7 @@ def main() -> None:
     cols[0].metric("Universe", f"{len(df):,}")
     cols[1].metric("With price data", f"{covered:,}")
     cols[2].metric("Matching filters", f"{len(filtered):,}")
-    if change_col in filtered.columns and filtered[change_col].notna().any():
+    if change_col and change_col in filtered.columns and filtered[change_col].notna().any():
         cols[3].metric(f"Median {change_col}", f"{filtered[change_col].median():.2f}%")
 
     st.caption(source)
