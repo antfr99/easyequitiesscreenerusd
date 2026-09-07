@@ -154,25 +154,36 @@ def load_universe(path: str | Path) -> tuple[pd.DataFrame, list[str]]:
     columns in the export (Trade Date, Purchase Price, Quantity) are dropped,
     since they describe a holding rather than the universe.
 
-    Real EasyEquities exports sometimes have a row with an extra unquoted
-    comma (usually a company name like "Smith, Jones & Co" typed straight
-    into Excel without quotes), which throws off the column count for that
-    one line. Rather than let the whole load crash on one bad row, we skip
-    it and report exactly what was dropped so it can be fixed at the source.
+    Hand-maintained exports routinely contain company names with an unquoted
+    comma ("Booking Holdings, Inc.", "Alphabet Inc., Class A"), which pushes
+    that row to one extra field. These are recovered automatically by
+    rejoining the surplus back into Company Name — the user never needs to
+    see or fix them. Only rows that can't be recovered (two or more extra
+    fields, or too few) are reported.
 
-    Returns (dataframe, skipped_rows) where skipped_rows is a list of short
-    descriptions of any row that couldn't be parsed.
+    Returns (dataframe, warnings). warnings lists genuinely unrecoverable
+    rows and duplicate symbols; it's empty in the normal case.
     """
-    skipped: list[str] = []
+    warnings: list[str] = []
 
-    def _on_bad_line(bad_line: list[str]) -> None:
-        skipped.append(",".join(bad_line))
-        return None  # drop it
+    # Field count of the real header, so recovery knows how many columns a
+    # good row has (the full export width, e.g. 7, not just the 4 we keep).
+    try:
+        header = _read_csv_robust(path, nrows=0)
+        n = len(header.columns)
+    except Exception:
+        n = len(REQUIRED_COLUMNS)
+
+    def _on_bad_line(fields: list[str]) -> list[str] | None:
+        # Exactly one extra field: assume a stray comma inside the last
+        # column (Company Name) and stitch the tail back together.
+        if len(fields) == n + 1:
+            return fields[: n - 1] + [",".join(fields[n - 1:])]
+        warnings.append(",".join(fields))
+        return None  # unrecoverable — drop it
 
     try:
-        df = _read_csv_robust(
-            path, on_bad_lines=_on_bad_line, engine="python"
-        )
+        df = _read_csv_robust(path, on_bad_lines=_on_bad_line, engine="python")
     except Exception as exc:
         raise ValueError(f"Could not read the CSV: {exc}") from exc
 
@@ -196,10 +207,10 @@ def load_universe(path: str | Path) -> tuple[pd.DataFrame, list[str]]:
 
     dupes = df.loc[df.duplicated(subset="Symbol", keep=False), "Symbol"].unique().tolist()
     if dupes:
-        skipped.append(f"Duplicate symbol(s) kept first occurrence only: {', '.join(dupes)}")
+        warnings.append(f"Duplicate symbol(s) kept first occurrence only: {', '.join(dupes)}")
     df = df.drop_duplicates(subset="Symbol").reset_index(drop=True)
 
-    return df, skipped
+    return df, warnings
 
 
 # --------------------------------------------------------------------------
