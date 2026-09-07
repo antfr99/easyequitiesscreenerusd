@@ -33,7 +33,7 @@ SNAPSHOT = DATA_DIR / "snapshot.parquet"
 SNAPSHOT_META = DATA_DIR / "snapshot_meta.json"
 
 st.set_page_config(
-    page_title="EasyEquities USD Screener",
+    page_title="EasyEquities USD Equity Screener",
     page_icon="📈",
     layout="wide",
 )
@@ -58,30 +58,9 @@ def get_snapshot(path: str, mtime: float) -> pd.DataFrame:
     return df
 
 
-@st.cache_data(ttl=60 * 60, show_spinner=False)
-def fetch_live(csv_path: str, mtime: float, days: int) -> tuple[pd.DataFrame, list[str]]:
-    """Live pull. Cached for an hour so a rerun does not re-download."""
-    universe, skipped = core.load_universe(csv_path)
-    symbols = universe["Symbol"].tolist()
-
-    bar = st.progress(0.0, text="Contacting Yahoo Finance…")
-
-    def on_progress(done, total, label):
-        bar.progress(done / total, text=f"Downloading prices — {label}")
-
-    frames = core.download_prices(
-        symbols,
-        days=days,
-        session=get_session(),
-        progress_cb=on_progress,
-    )
-    bar.empty()
-    return core.build_metrics_frame(universe, frames), skipped
-
-
-def load_data(csv_path: Path) -> tuple[pd.DataFrame, str, list[str]]:
+def load_data(csv_path: Path) -> tuple[pd.DataFrame, str, list[str], list[str]]:
     """
-    Returns (frame, source_label, csv_warnings).
+    Returns (frame, source_label, errors, notes).
 
     Order of preference:
       1. A pre-built snapshot (data/snapshot.parquet) — instant, no Yahoo call.
@@ -98,30 +77,33 @@ def load_data(csv_path: Path) -> tuple[pd.DataFrame, str, list[str]]:
     if SNAPSHOT.exists():
         df = get_snapshot(str(SNAPSHOT), SNAPSHOT.stat().st_mtime)
         stamp = "unknown"
-        csv_warnings: list[str] = []
+        errors: list[str] = []
+        notes: list[str] = []
         if SNAPSHOT_META.exists():
             try:
                 meta = json.loads(SNAPSHOT_META.read_text())
                 stamp = meta.get("built_at", "unknown")
-                csv_warnings = meta.get("csv_warnings", [])
+                errors = meta.get("csv_errors", meta.get("csv_warnings", []))
+                notes = meta.get("csv_notes", [])
             except Exception:
                 pass
-        return df, f"Snapshot built {stamp}", csv_warnings
+        return df, f"Snapshot built {stamp}", errors, notes
 
     # A live pull the user triggered earlier this session.
     if "live_df" in st.session_state:
         return (
             st.session_state["live_df"],
             st.session_state.get("live_source", "Live pull"),
-            st.session_state.get("live_warnings", []),
+            st.session_state.get("live_errors", []),
+            st.session_state.get("live_notes", []),
         )
 
     # Default: universe only, no prices, no network call.
-    universe, skipped = core.load_universe(str(csv_path))
+    universe, errors, notes = core.load_universe(str(csv_path))
     for col in core.EMPTY_METRIC_COLUMNS:
         universe[col] = np.nan
     universe["Yahoo"] = "https://finance.yahoo.com/quote/" + universe["Symbol"]
-    return universe, "No snapshot yet — prices not loaded", skipped
+    return universe, "No snapshot yet — prices not loaded", errors, notes
 
 
 # --------------------------------------------------------------------------
@@ -160,13 +142,59 @@ def ticker_column_config() -> dict:
 # Sidebar filters
 # --------------------------------------------------------------------------
 
-def sidebar_filters(df: pd.DataFrame) -> tuple[pd.DataFrame, str | None]:
+def _load_sectors(csv_path: Path, targets: list[str], base: pd.DataFrame) -> None:
+    """Download prices for the given sectors, merge into base, and rerun."""
+    universe_all, _errors, _notes = core.load_universe(str(csv_path))
+    subset = universe_all[universe_all["Sector"].isin(targets)]
+    with st.spinner(f"Downloading {len(subset)} tickers in {', '.join(targets)}…"):
+        frames = core.download_prices(
+            subset["Symbol"].tolist(),
+            days=core.DEFAULT_HISTORY_DAYS,
+            session=get_session(),
+        )
+        merged = core.merge_metrics(base, universe_all, frames)
+    loaded = st.session_state.get("loaded_sectors", [])
+    st.session_state["live_df"] = merged
+    st.session_state["loaded_sectors"] = loaded + [t for t in targets if t not in loaded]
+    st.session_state["live_errors"] = _errors
+    st.session_state["live_notes"] = _notes
+    st.session_state["live_source"] = (
+        f"Live pull {datetime.now(timezone.utc):%Y-%m-%d %H:%M UTC} — "
+        f"{len(st.session_state['loaded_sectors'])} sector(s)"
+    )
+    st.rerun()
+
+
+def sidebar_filters(
+    df: pd.DataFrame,
+    csv_path: Path | None = None,
+    no_snapshot: bool = False,
+) -> tuple[pd.DataFrame, str | None]:
     st.sidebar.header("Filters")
 
     search = st.sidebar.text_input("Search ticker or company", placeholder="e.g. AEHR")
 
     sectors = sorted(df["Sector"].dropna().unique())
     chosen_sectors = st.sidebar.multiselect("Sector", sectors, default=[])
+
+    # On-demand loading lives right under the Sector picker: if a chosen
+    # sector's prices aren't loaded yet, offer to load exactly those. This
+    # unifies "which sector to load" and "which sector to view" into one
+    # control instead of a separate loader panel.
+    if no_snapshot and csv_path is not None:
+        loaded = st.session_state.get("loaded_sectors", [])
+        to_load = [s for s in chosen_sectors if s not in loaded]
+        if to_load:
+            if st.sidebar.button(
+                f"⬇ Load prices for {len(to_load)} selected sector(s)",
+                type="primary",
+                use_container_width=True,
+            ):
+                _load_sectors(csv_path, to_load, df)
+        elif not chosen_sectors and not loaded:
+            st.sidebar.caption("Select a sector above, then load its prices.")
+        if loaded:
+            st.sidebar.caption("Loaded: " + ", ".join(loaded))
 
     # Industry list is scoped to the chosen sector(s): pick Financials and
     # only Financials industries appear. With no sector chosen, all show.
@@ -389,7 +417,7 @@ def group_view(df: pd.DataFrame, level: str, change_col: str | None) -> None:
 # --------------------------------------------------------------------------
 
 def main() -> None:
-    st.title("📈 EasyEquities USD Screener")
+    st.title("📈 EasyEquities USD Equity Screener")
 
     csv_path, notes = core.find_universe_csv(ROOT, DATA_DIR)
     if csv_path is None:
@@ -403,85 +431,49 @@ def main() -> None:
                     st.write("•", n)
         st.stop()
 
-    df, source, csv_warnings = load_data(csv_path)
+    df, source, csv_errors, csv_notes = load_data(csv_path)
 
     if "Close" not in df.columns:
         st.error("The loaded data has no price columns. Rebuild the snapshot.")
         st.stop()
 
-    # When there is no snapshot and no session pull yet, prices are all NaN.
-    # Offer to load them on demand instead of blocking the page at startup.
-    prices_loaded = df["Close"].notna().any()
+    # When there is no snapshot, prices load on demand via the sidebar
+    # Sector filter (see sidebar_filters). Show a short banner explaining that.
     no_snapshot = not SNAPSHOT.exists()
 
     if no_snapshot:
         loaded_sectors = st.session_state.get("loaded_sectors", [])
-        universe_all, _ = core.load_universe(str(csv_path))
+        universe_all, _e, _n = core.load_universe(str(csv_path))
         all_sectors = sorted(universe_all["Sector"].dropna().unique())
-        remaining = [s for s in all_sectors if s not in loaded_sectors]
-
-        with st.container():
-            st.warning(
-                "No daily snapshot is committed yet, so prices load on demand. "
-                "Pick a sector and load it — each is a small, fast pull that's "
-                "far less likely to be throttled than the whole universe at once. "
-                "Load as many sectors as you like; they accumulate.",
+        if len(loaded_sectors) < len(all_sectors):
+            st.info(
+                "No daily snapshot yet, so prices load on demand. Pick one or "
+                "more sectors in the left sidebar and load them — they accumulate. "
+                "This is a personal hobby project and is **not affiliated with, "
+                "endorsed by, or connected to EasyEquities** in any way.",
                 icon="⏳",
             )
-            c1, c2 = st.columns([2, 1])
-            with c1:
-                if remaining:
-                    sector_to_load = st.selectbox(
-                        "Sector to load",
-                        remaining,
-                        help=f"{len(loaded_sectors)} of {len(all_sectors)} sectors loaded so far.",
-                    )
-                else:
-                    sector_to_load = None
-                    st.success("All sectors loaded.")
-            with c2:
-                st.write("")
-                st.write("")
-                load_all = st.button("Load ALL remaining", help="Slower; may be throttled.")
-
-            if loaded_sectors:
-                st.caption("Loaded: " + ", ".join(loaded_sectors))
-
-            targets: list[str] = []
-            if sector_to_load and st.button(f"Load {sector_to_load}", type="primary"):
-                targets = [sector_to_load]
-            elif load_all and remaining:
-                targets = remaining
-
-            if targets:
-                base = df.copy()
-                subset = universe_all[universe_all["Sector"].isin(targets)]
-                with st.spinner(f"Downloading {len(subset)} tickers in {', '.join(targets)}…"):
-                    frames = core.download_prices(
-                        subset["Symbol"].tolist(),
-                        days=core.DEFAULT_HISTORY_DAYS,
-                        session=get_session(),
-                    )
-                    merged = core.merge_metrics(base, universe_all, frames)
-                st.session_state["live_df"] = merged
-                st.session_state["loaded_sectors"] = loaded_sectors + targets
-                st.session_state["live_source"] = (
-                    f"Live pull {datetime.now(timezone.utc):%Y-%m-%d %H:%M UTC} — "
-                    f"{len(loaded_sectors) + len(targets)} sector(s)"
-                )
-                st.rerun()
-
-    if csv_warnings:
-        with st.expander(f"⚠️ {len(csv_warnings)} row(s) in the CSV needed attention", expanded=False):
+        elif loaded_sectors:
             st.caption(
-                "Usually an unquoted comma inside Company Name (e.g. \"Smith, Jones & Co\") "
-                "throws off the column count for that line. Wrap the name in quotes in the "
-                "CSV to fix it permanently."
+                "Not affiliated with, endorsed by, or connected to EasyEquities — "
+                "a personal hobby project."
             )
-            for w in csv_warnings:
+
+    # Only genuinely unparseable rows get a warning the user should act on.
+    if csv_errors:
+        with st.expander(f"⚠️ {len(csv_errors)} row(s) couldn't be read", expanded=False):
+            st.caption(
+                "These rows had a column count we couldn't recover — usually more "
+                "than one stray comma. Check them in the CSV; everything else loaded."
+            )
+            for w in csv_errors:
                 st.write("•", w)
 
-    filtered, change_col = sidebar_filters(df)
+    # Duplicates and other housekeeping are informational, not problems.
+    if csv_notes:
+        st.caption(" · ".join(csv_notes))
+
+    filtered, change_col = sidebar_filters(df, csv_path, no_snapshot)
 
     covered = int(df["Close"].notna().sum())
     cols = st.columns(4)
@@ -512,12 +504,12 @@ def main() -> None:
         st.divider()
         if "live_df" in st.session_state:
             if st.button("Clear loaded prices"):
-                for k in ("live_df", "live_source", "live_warnings", "loaded_sectors"):
+                for k in ("live_df", "live_source", "live_errors", "live_notes", "loaded_sectors"):
                     st.session_state.pop(k, None)
                 st.rerun()
         if st.button("Clear cache and reload"):
             st.cache_data.clear()
-            for k in ("live_df", "live_source", "live_warnings", "loaded_sectors"):
+            for k in ("live_df", "live_source", "live_errors", "live_notes", "loaded_sectors"):
                 st.session_state.pop(k, None)
             st.rerun()
 
