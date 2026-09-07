@@ -460,9 +460,10 @@ def main() -> None:
     st.title("📈 EasyEquities USD Equity Screener")
 
     st.warning(
-        "Large Runs pulling all or a large number of tickers may take a few minutes. "
-        "The data may contain errors, missing values, or gaps, so results should be "
-        "treated as data for a personal hobby project only and are **not financial advice**.",
+        "Please note: Running all or a large number of tickers may take a few minutes to complete. "
+        "Data is sourced from external providers and may contain missing values. "
+        "This screener is a personal data hobby project and is not intended to provide financial "
+        "advice or investment recommendations.",
         icon="⚠️",
     )
 
