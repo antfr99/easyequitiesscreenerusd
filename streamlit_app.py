@@ -1,427 +1,228 @@
 """
-EasyEquities USD Screener
-=========================
+Build the price snapshot the Streamlit app reads.
 
-Ticker, sector and industry views over the USD universe.
+Run locally:
+    python scripts/build_snapshot.py
 
-Data comes from a pre-built snapshot (data/snapshot.parquet) when one is
-present, and falls back to a live yfinance pull otherwise. The snapshot is
-strongly preferred: it is built once a day by a GitHub Action, so the app
-never has to hit Yahoo while a user is waiting, and never gets rate limited
-in front of an audience.
+Run in CI (see .github/workflows/refresh-snapshot.yml) once a day after the
+US close. This is the piece that keeps the app off Yahoo's rate limiter:
+the download happens on a schedule with no user waiting on it, and the app
+only ever reads a parquet file.
+
+Optional fundamentals (--with-fundamentals) add market cap, P/E and dividend
+yield. Those come from Ticker.info, which is one request per symbol, so it
+is slow and only ever appropriate inside the scheduled job.
 """
 
 from __future__ import annotations
 
+import argparse
 import json
+import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
-import streamlit as st
 
-import screener_core as core
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-# --------------------------------------------------------------------------
-# Paths and page setup
-# --------------------------------------------------------------------------
+import screener_core as core  # noqa: E402
 
-ROOT = Path(__file__).parent
+ROOT = Path(__file__).resolve().parent
+if not (ROOT / "screener_core.py").exists():
+    ROOT = ROOT.parent  # script lives in scripts/, core module is one level up
 DATA_DIR = ROOT / "data"
-SNAPSHOT = DATA_DIR / "snapshot.parquet"
-SNAPSHOT_META = DATA_DIR / "snapshot_meta.json"
-
-st.set_page_config(
-    page_title="EasyEquities USD Screener",
-    page_icon="📈",
-    layout="wide",
-)
-
-CHANGE_COLS = ["% 1d", "% 1w", "% 4w", "% 13w", "% 26w", "% 52w"]
 
 
-# --------------------------------------------------------------------------
-# Data loading (two-tier cache: resource for the session, data for frames)
-# --------------------------------------------------------------------------
-
-@st.cache_resource
-def get_session():
-    return core.make_session()
-
-
-@st.cache_data(show_spinner=False)
-def get_snapshot(path: str, mtime: float) -> pd.DataFrame:
-    df = pd.read_parquet(path)
-    if "As Of" in df.columns:
-        df["As Of"] = pd.to_datetime(df["As Of"]).dt.date
-    return df
+def find_universe_csv() -> Path:
+    path, notes = core.find_universe_csv(ROOT, DATA_DIR)
+    if path is None:
+        for n in notes:
+            print(f"[warn] {n}")
+        raise SystemExit("No universe CSV found (needs Symbol, Sector, Industry columns).")
+    return path
 
 
-@st.cache_data(ttl=60 * 60, show_spinner=False)
-def fetch_live(csv_path: str, mtime: float, days: int) -> tuple[pd.DataFrame, list[str]]:
-    """Live pull. Cached for an hour so a rerun does not re-download."""
-    universe, skipped = core.load_universe(csv_path)
-    symbols = universe["Symbol"].tolist()
+def merge_with_previous(fresh: pd.DataFrame, previous_path: Path) -> pd.DataFrame:
+    """
+    Carry forward the last good values for any symbol this run failed to
+    fetch.
 
-    bar = st.progress(0.0, text="Contacting Yahoo Finance…")
+    This is the key to surviving rate limits. Yahoo throttles by IP, and at
+    863 symbols a run will sometimes get cut off partway. Without this, one
+    throttled run would blank out the app. With it, a partial run simply
+    refreshes part of the universe and the rest keeps yesterday's numbers,
+    clearly marked stale by the "As Of" column.
+    """
+    if not previous_path.exists():
+        return fresh
 
-    def on_progress(done, total, label):
-        bar.progress(done / total, text=f"Downloading prices — {label}")
+    try:
+        previous = pd.read_parquet(previous_path)
+    except Exception as exc:
+        print(f"[warn] could not read previous snapshot: {exc}")
+        return fresh
 
-    frames = core.download_prices(
-        symbols,
-        days=days,
-        session=get_session(),
-        progress_cb=on_progress,
-    )
-    bar.empty()
-    return core.build_metrics_frame(universe, frames), skipped
+    fresh = fresh.set_index("Symbol")
+    previous = previous.set_index("Symbol")
 
+    stale_symbols = fresh.index[fresh["Close"].isna()]
+    carry = previous.index.intersection(stale_symbols)
+    if len(carry) == 0:
+        return fresh.reset_index()
 
-def load_data(csv_path: Path) -> tuple[pd.DataFrame, str, list[str]]:
-    """Returns (frame, source_label, csv_warnings)."""
-    if SNAPSHOT.exists():
-        df = get_snapshot(str(SNAPSHOT), SNAPSHOT.stat().st_mtime)
-        stamp = "unknown"
-        csv_warnings: list[str] = []
-        if SNAPSHOT_META.exists():
-            try:
-                meta = json.loads(SNAPSHOT_META.read_text())
-                stamp = meta.get("built_at", "unknown")
-                csv_warnings = meta.get("csv_warnings", [])
-            except Exception:
-                pass
-        return df, f"Snapshot built {stamp}", csv_warnings
+    # Only carry metric columns; Sector / Industry / Name come from the CSV,
+    # which is the source of truth and may have been edited since.
+    identity = {"Sector", "Industry", "Company Name"}
+    cols = [c for c in fresh.columns if c not in identity and c in previous.columns]
+    fresh.loc[carry, cols] = previous.loc[carry, cols]
 
-    st.info(
-        "No snapshot found, so prices will be pulled live. The first load takes "
-        "a few minutes for the full universe.",
-        icon="⏳",
-    )
-    df, skipped = fetch_live(str(csv_path), csv_path.stat().st_mtime, core.DEFAULT_HISTORY_DAYS)
-    return df, f"Live pull {datetime.now(timezone.utc):%Y-%m-%d %H:%M UTC}", skipped
+    print(f"Carried forward {len(carry)} symbol(s) from the previous snapshot.")
+    return fresh.reset_index()
 
 
-# --------------------------------------------------------------------------
-# Formatting helpers
-# --------------------------------------------------------------------------
+def add_fundamentals(df: pd.DataFrame, session, pause: float = 0.4) -> pd.DataFrame:
+    """
+    One Ticker.info call per symbol, deliberately throttled. Expect roughly
+    10 minutes for 863 symbols. Failures are tolerated and left as NaN.
+    """
+    import yfinance as yf
 
-def pct_column(label: str) -> st.column_config.NumberColumn:
-    return st.column_config.NumberColumn(label, format="%.2f%%")
+    rows = []
+    total = len(df)
+    for i, sym in enumerate(df["Symbol"], start=1):
+        record = {"Symbol": sym}
+        try:
+            info = yf.Ticker(sym, session=session).info or {}
+            record["Market Cap"] = info.get("marketCap")
+            record["Trailing P/E"] = info.get("trailingPE")
+            record["Forward P/E"] = info.get("forwardPE")
+            record["Dividend Yield %"] = (
+                info.get("dividendYield") * 100
+                if isinstance(info.get("dividendYield"), (int, float))
+                else None
+            )
+        except Exception as exc:
+            print(f"[warn] info failed for {sym}: {exc}")
+        rows.append(record)
 
+        if i % 50 == 0:
+            print(f"  fundamentals {i}/{total}")
+        time.sleep(pause)
 
-def price_column(label: str) -> st.column_config.NumberColumn:
-    return st.column_config.NumberColumn(label, format="$%.2f")
+    return df.merge(pd.DataFrame(rows), on="Symbol", how="left")
 
-
-def ticker_column_config() -> dict:
-    cfg = {
-        "Yahoo": st.column_config.LinkColumn("Chart", display_text="open"),
-        "Close": price_column("Close"),
-        "Close 4w ago": price_column("Close 4w ago"),
-        "52w High": price_column("52w High"),
-        "52w Low": price_column("52w Low"),
-        "SMA20": price_column("SMA20"),
-        "SMA50": price_column("SMA50"),
-        "SMA200": price_column("SMA200"),
-        "Avg Volume 20d": st.column_config.NumberColumn("Avg Vol 20d", format="%.0f"),
-        "Avg $ Volume 20d": st.column_config.NumberColumn("Avg $ Vol 20d", format="$%.0f"),
-        "Volatility 1m %": pct_column("Vol 1m (ann.)"),
-    }
-    for c in CHANGE_COLS + ["% vs SMA20", "% vs SMA50", "% vs SMA200",
-                            "% off 52w High", "% above 52w Low"]:
-        cfg[c] = pct_column(c)
-    return cfg
-
-
-# --------------------------------------------------------------------------
-# Sidebar filters
-# --------------------------------------------------------------------------
-
-def sidebar_filters(df: pd.DataFrame) -> tuple[pd.DataFrame, str | None]:
-    st.sidebar.header("Filters")
-
-    available_change_cols = [c for c in CHANGE_COLS if c in df.columns]
-    if not available_change_cols:
-        st.sidebar.warning("No price data loaded yet — filters are limited.")
-        search = st.sidebar.text_input("Search ticker or company", placeholder="e.g. AEHR")
-        out = df.copy()
-        if search.strip():
-            q = search.strip().lower()
-            out = out[
-                out["Symbol"].str.lower().str.contains(q, na=False)
-                | out["Company Name"].str.lower().str.contains(q, na=False)
-            ]
-        return out, None
-
-    change_col = st.sidebar.selectbox(
-        "Performance window",
-        available_change_cols,
-        index=available_change_cols.index("% 4w") if "% 4w" in available_change_cols else 0,
-        help="Drives the sliders below and the sector / industry rankings.",
-    )
-
-    search = st.sidebar.text_input("Search ticker or company", placeholder="e.g. AEHR")
-
-    sectors = sorted(df["Sector"].dropna().unique())
-    chosen_sectors = st.sidebar.multiselect("Sector", sectors, default=[])
-
-    scoped = df[df["Sector"].isin(chosen_sectors)] if chosen_sectors else df
-    industries = sorted(scoped["Industry"].dropna().unique())
-    chosen_industries = st.sidebar.multiselect("Industry", industries, default=[])
-
-    st.sidebar.divider()
-
-    # Performance range
-    series = df[change_col].replace([np.inf, -np.inf], np.nan).dropna()
-    if not series.empty:
-        lo = float(np.floor(max(series.min(), -100)))
-        hi = float(np.ceil(min(series.max(), 500)))
-        perf_range = st.sidebar.slider(
-            f"{change_col} range",
-            min_value=lo,
-            max_value=hi,
-            value=(lo, hi),
-            step=1.0,
-        )
-    else:
-        perf_range = None
-
-    # Price range
-    prices = df["Close"].dropna()
-    if not prices.empty:
-        price_range = st.sidebar.slider(
-            "Close price ($)",
-            min_value=0.0,
-            max_value=float(np.ceil(prices.max())),
-            value=(0.0, float(np.ceil(prices.max()))),
-        )
-    else:
-        price_range = None
-
-    min_dollar_vol = st.sidebar.number_input(
-        "Min avg $ volume (20d)",
-        min_value=0,
-        value=0,
-        step=100_000,
-        help="Liquidity floor. 1,000,000 filters out most of the untradeable tail.",
-    )
-
-    st.sidebar.divider()
-    trend = st.sidebar.radio(
-        "Trend",
-        ["Any", "Above SMA50", "Below SMA50", "Above SMA200", "Below SMA200"],
-        index=0,
-    )
-    near_high = st.sidebar.checkbox("Within 10% of 52w high")
-    hide_missing = st.sidebar.checkbox("Hide tickers with no price data", value=True)
-    hide_stale = (
-        st.sidebar.checkbox(
-            "Hide stale rows",
-            value=False,
-            help="Rows carried forward from an earlier snapshot because Yahoo "
-                 "throttled the last refresh.",
-        )
-        if "Stale" in df.columns
-        else False
-    )
-
-    # ----- apply -----
-    out = df.copy()
-
-    if search.strip():
-        q = search.strip().lower()
-        out = out[
-            out["Symbol"].str.lower().str.contains(q, na=False)
-            | out["Company Name"].str.lower().str.contains(q, na=False)
-        ]
-    if chosen_sectors:
-        out = out[out["Sector"].isin(chosen_sectors)]
-    if chosen_industries:
-        out = out[out["Industry"].isin(chosen_industries)]
-    if perf_range:
-        out = out[out[change_col].between(*perf_range) | out[change_col].isna()]
-    if price_range:
-        out = out[out["Close"].between(*price_range) | out["Close"].isna()]
-    if min_dollar_vol > 0 and "Avg $ Volume 20d" in out.columns:
-        out = out[out["Avg $ Volume 20d"] >= min_dollar_vol]
-
-    if trend == "Above SMA50":
-        out = out[out["% vs SMA50"] > 0]
-    elif trend == "Below SMA50":
-        out = out[out["% vs SMA50"] < 0]
-    elif trend == "Above SMA200":
-        out = out[out["% vs SMA200"] > 0]
-    elif trend == "Below SMA200":
-        out = out[out["% vs SMA200"] < 0]
-
-    if near_high and "% off 52w High" in out.columns:
-        out = out[out["% off 52w High"] >= -10]
-
-    if hide_missing:
-        out = out[out["Close"].notna()]
-    if hide_stale:
-        out = out[~out["Stale"].fillna(False)]
-
-    return out, change_col
-
-
-# --------------------------------------------------------------------------
-# Views
-# --------------------------------------------------------------------------
-
-def ticker_view(df: pd.DataFrame, change_col: str | None) -> None:
-    st.subheader("Tickers")
-
-    display_cols = [
-        "Symbol", "Company Name", "Sector", "Industry",
-        "Close", "Close 4w ago", "% 4w",
-        "% 1d", "% 1w", "% 13w", "% 26w", "% 52w",
-        "% vs SMA50", "% vs SMA200", "% off 52w High",
-        "Volatility 1m %", "Avg $ Volume 20d", "As Of", "Yahoo",
-    ]
-    display_cols = [c for c in display_cols if c in df.columns]
-
-    if change_col and change_col in df.columns:
-        view = df[display_cols].sort_values(change_col, ascending=False, na_position="last")
-    else:
-        view = df[display_cols].sort_values("Symbol")
-
-    st.dataframe(
-        view,
-        column_config=ticker_column_config(),
-        hide_index=True,
-        width="stretch",
-        height=560,
-    )
-
-    st.download_button(
-        "Download these tickers (CSV)",
-        view.to_csv(index=False).encode("utf-8"),
-        file_name="screener_tickers.csv",
-        mime="text/csv",
-    )
-
-    if len(view) and change_col and change_col in view.columns:
-        left, right = st.columns(2)
-        top = view.nlargest(15, change_col)[["Symbol", change_col]]
-        bottom = view.nsmallest(15, change_col)[["Symbol", change_col]]
-        with left:
-            st.caption(f"Top 15 by {change_col}")
-            st.bar_chart(top.set_index("Symbol"), horizontal=True)
-        with right:
-            st.caption(f"Bottom 15 by {change_col}")
-            st.bar_chart(bottom.set_index("Symbol"), horizontal=True)
-
-
-def group_view(df: pd.DataFrame, level: str, change_col: str | None) -> None:
-    st.subheader(level)
-
-    if not change_col:
-        st.info("No price data loaded yet, so there's nothing to rank by.")
-        return
-
-    agg = core.aggregate(df, level, change_col)
-    if agg.empty:
-        st.warning("Nothing to aggregate with the current filters.")
-        return
-
-    median_col = f"Median {change_col}"
-    cfg = {
-        c: pct_column(c)
-        for c in agg.columns
-        if c.startswith(("Median", "Mean", "Best %", "Worst %", "% Advancing"))
-    }
-    cfg["Tickers"] = st.column_config.NumberColumn("Tickers", format="%d")
-
-    st.dataframe(
-        agg,
-        column_config=cfg,
-        hide_index=True,
-        width="stretch",
-        height=480,
-    )
-
-    chart = agg.set_index(level if level == "Sector" else "Industry")[median_col]
-    st.caption(f"{median_col} by {level.lower()}")
-    st.bar_chart(chart, horizontal=True)
-
-    st.download_button(
-        f"Download {level.lower()} summary (CSV)",
-        agg.to_csv(index=False).encode("utf-8"),
-        file_name=f"screener_{level.lower()}.csv",
-        mime="text/csv",
-    )
-
-
-# --------------------------------------------------------------------------
-# Main
-# --------------------------------------------------------------------------
 
 def main() -> None:
-    st.title("📈 EasyEquities USD Screener")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--days", type=int, default=core.DEFAULT_HISTORY_DAYS)
+    parser.add_argument("--batch-size", type=int, default=core.DEFAULT_BATCH_SIZE)
+    parser.add_argument("--pause", type=float, default=core.DEFAULT_PAUSE)
+    parser.add_argument("--with-fundamentals", action="store_true")
+    parser.add_argument("--limit", type=int, default=0, help="Only fetch N symbols (testing).")
+    parser.add_argument(
+        "--shard",
+        default="",
+        help="Fetch only part of the universe, as i/n (e.g. 2/4). Lets you "
+             "spread 863 symbols across several runs to stay under Yahoo's "
+             "hourly ceiling. Untouched symbols keep their previous values.",
+    )
+    args = parser.parse_args()
 
-    csv_path, notes = core.find_universe_csv(ROOT, DATA_DIR)
-    if csv_path is None:
-        st.error(
-            "Could not find the universe CSV. Expected a file with Symbol, "
-            "Sector and Industry columns in data/ or the repo root."
-        )
-        if notes:
-            with st.expander("Why", expanded=True):
-                for n in notes:
-                    st.write("•", n)
-        st.stop()
+    csv_path = find_universe_csv()
+    print(f"Universe: {csv_path.name}")
 
-    df, source, csv_warnings = load_data(csv_path)
-
-    if "Close" not in df.columns:
-        st.error("The loaded data has no price columns. Rebuild the snapshot.")
-        st.stop()
+    universe, csv_warnings = core.load_universe(csv_path)
+    full_universe = universe.copy()
 
     if csv_warnings:
-        with st.expander(f"⚠️ {len(csv_warnings)} row(s) in the CSV needed attention", expanded=False):
-            st.caption(
-                "Usually an unquoted comma inside Company Name (e.g. \"Smith, Jones & Co\") "
-                "throws off the column count for that line. Wrap the name in quotes in the "
-                "CSV to fix it permanently."
-            )
-            for w in csv_warnings:
-                st.write("•", w)
+        print(f"[warn] {len(csv_warnings)} row(s) in the CSV needed attention:")
+        for w in csv_warnings[:10]:
+            print(f"  - {w}")
+        if len(csv_warnings) > 10:
+            print(f"  ... and {len(csv_warnings) - 10} more")
 
-    filtered, change_col = sidebar_filters(df)
+    if args.limit:
+        universe = universe.head(args.limit)
+    if args.shard:
+        i, n = (int(x) for x in args.shard.split("/"))
+        universe = universe.iloc[(i - 1) :: n]
+        print(f"Shard {i}/{n}: {len(universe)} symbols")
+
+    symbols = universe["Symbol"].tolist()
+    print(f"Symbols to fetch: {len(symbols)} (universe is {len(full_universe)})")
+
+    session = core.make_session()
+    if session is None:
+        print("[warn] curl_cffi unavailable — expect a higher chance of throttling.")
+
+    started = time.time()
+    frames = core.download_prices(
+        symbols,
+        days=args.days,
+        batch_size=args.batch_size,
+        pause=args.pause,
+        session=session,
+        progress_cb=lambda done, total, label: print(f"  {label}"),
+    )
+    print(f"Pass 1: {len(frames)}/{len(symbols)} in {time.time() - started:.0f}s")
+
+    # Second pass for whatever came back empty, slower and single-threaded-ish.
+    missed = [s for s in symbols if s not in frames]
+    if missed:
+        print(f"Retrying {len(missed)} symbol(s) after a cool-off…")
+        time.sleep(30)
+        retry = core.download_prices(
+            missed,
+            days=args.days,
+            batch_size=max(10, args.batch_size // 3),
+            pause=max(3.0, args.pause * 3),
+            session=session,
+            progress_cb=lambda done, total, label: print(f"  retry {label}"),
+        )
+        frames.update(retry)
+        print(f"Pass 2 recovered {len(retry)}/{len(missed)}")
+
+    # Always build against the FULL universe so the snapshot keeps every row,
+    # then fill the gaps from the previous snapshot.
+    df = core.build_metrics_frame(full_universe, frames)
+    df = merge_with_previous(df, DATA_DIR / "snapshot.parquet")
+
+    if "As Of" in df.columns and df["As Of"].notna().any():
+        newest = pd.to_datetime(df["As Of"]).max()
+        df["Stale"] = pd.to_datetime(df["As Of"]) < newest
+
+    if args.with_fundamentals:
+        print("Fetching fundamentals (slow)…")
+        df = add_fundamentals(df, session)
+
+    DATA_DIR.mkdir(exist_ok=True)
+    out = DATA_DIR / "snapshot.parquet"
+    df.to_parquet(out, index=False)
 
     covered = int(df["Close"].notna().sum())
-    cols = st.columns(4)
-    cols[0].metric("Universe", f"{len(df):,}")
-    cols[1].metric("With price data", f"{covered:,}")
-    cols[2].metric("Matching filters", f"{len(filtered):,}")
-    if change_col and change_col in filtered.columns and filtered[change_col].notna().any():
-        cols[3].metric(f"Median {change_col}", f"{filtered[change_col].median():.2f}%")
+    stale = int(df["Stale"].sum()) if "Stale" in df.columns else 0
+    meta = {
+        "built_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        "universe_size": len(full_universe),
+        "symbols_fetched_this_run": len(symbols),
+        "symbols_with_data": covered,
+        "symbols_carried_forward": stale,
+        "shard": args.shard or "all",
+        "missing": sorted(df.loc[df["Close"].isna(), "Symbol"].tolist()),
+        "csv_warnings": csv_warnings,
+        "history_days": args.days,
+        "fundamentals": bool(args.with_fundamentals),
+    }
+    (DATA_DIR / "snapshot_meta.json").write_text(json.dumps(meta, indent=2))
 
-    st.caption(source)
-
-    if covered < len(df):
-        missing = len(df) - covered
-        st.caption(
-            f"{missing} symbol(s) returned no data — usually delistings, "
-            "ticker changes, or share classes Yahoo spells differently."
-        )
-
-    tab_t, tab_s, tab_i = st.tabs(["Tickers", "Sectors", "Industries"])
-    with tab_t:
-        ticker_view(filtered, change_col)
-    with tab_s:
-        group_view(filtered, "Sector", change_col)
-    with tab_i:
-        group_view(filtered, "Industry", change_col)
-
-    with st.sidebar:
-        st.divider()
-        if st.button("Clear cache and reload"):
-            st.cache_data.clear()
-            st.rerun()
+    print(f"Wrote {out} — {covered}/{len(full_universe)} symbols with data "
+          f"({stale} carried forward from the previous snapshot)")
+    if meta["missing"]:
+        print("Missing:", ", ".join(meta["missing"][:25]),
+              "…" if len(meta["missing"]) > 25 else "")
 
 
 if __name__ == "__main__":
