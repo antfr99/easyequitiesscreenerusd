@@ -25,21 +25,24 @@ from pathlib import Path
 
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import screener_core as core  # noqa: E402
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parent
+if not (ROOT / "screener_core.py").exists():
+    ROOT = ROOT.parent  # script lives in scripts/, core module is one level up
 DATA_DIR = ROOT / "data"
 
 
 def find_universe_csv() -> Path:
-    candidates = list(DATA_DIR.glob("*.csv")) + list(ROOT.glob("*.csv"))
-    for path in candidates:
-        head = pd.read_csv(path, nrows=1)
-        if {"Symbol", "Sector", "Industry"}.issubset({c.strip() for c in head.columns}):
-            return path
-    raise SystemExit("No universe CSV found (needs Symbol, Sector, Industry columns).")
+    path, notes = core.find_universe_csv(ROOT, DATA_DIR)
+    if path is None:
+        for n in notes:
+            print(f"[warn] {n}")
+        raise SystemExit("No universe CSV found (needs Symbol, Sector, Industry columns).")
+    return path
 
 
 def merge_with_previous(fresh: pd.DataFrame, previous_path: Path) -> pd.DataFrame:
@@ -131,8 +134,18 @@ def main() -> None:
     csv_path = find_universe_csv()
     print(f"Universe: {csv_path.name}")
 
-    universe = core.load_universe(csv_path)
+    universe, csv_errors, csv_notes = core.load_universe(csv_path)
     full_universe = universe.copy()
+
+    if csv_errors:
+        print(f"[warn] {len(csv_errors)} row(s) couldn't be read:")
+        for w in csv_errors[:10]:
+            print(f"  - {w}")
+        if len(csv_errors) > 10:
+            print(f"  ... and {len(csv_errors) - 10} more")
+    if csv_notes:
+        for n in csv_notes:
+            print(f"[note] {n}")
 
     if args.limit:
         universe = universe.head(args.limit)
@@ -202,6 +215,8 @@ def main() -> None:
         "symbols_carried_forward": stale,
         "shard": args.shard or "all",
         "missing": sorted(df.loc[df["Close"].isna(), "Symbol"].tolist()),
+        "csv_errors": csv_errors,
+        "csv_notes": csv_notes,
         "history_days": args.days,
         "fundamentals": bool(args.with_fundamentals),
     }
