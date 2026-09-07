@@ -163,10 +163,23 @@ def ticker_column_config() -> dict:
 def sidebar_filters(df: pd.DataFrame) -> tuple[pd.DataFrame, str | None]:
     st.sidebar.header("Filters")
 
+    search = st.sidebar.text_input("Search ticker or company", placeholder="e.g. AEHR")
+
+    sectors = sorted(df["Sector"].dropna().unique())
+    chosen_sectors = st.sidebar.multiselect("Sector", sectors, default=[])
+
+    # Industry list is scoped to the chosen sector(s): pick Financials and
+    # only Financials industries appear. With no sector chosen, all show.
+    scoped = df[df["Sector"].isin(chosen_sectors)] if chosen_sectors else df
+    industries = sorted(scoped["Industry"].dropna().unique())
+    chosen_industries = st.sidebar.multiselect("Industry", industries, default=[])
+
     available_change_cols = [c for c in CHANGE_COLS if c in df.columns]
-    if not available_change_cols:
-        st.sidebar.warning("No price data loaded yet — filters are limited.")
-        search = st.sidebar.text_input("Search ticker or company", placeholder="e.g. AEHR")
+    has_prices = bool(available_change_cols) and df["Close"].notna().any()
+
+    if not has_prices:
+        # No price data yet — sector/industry/search still work; skip the
+        # performance and price filters that would have nothing to act on.
         out = df.copy()
         if search.strip():
             q = search.strip().lower()
@@ -174,7 +187,13 @@ def sidebar_filters(df: pd.DataFrame) -> tuple[pd.DataFrame, str | None]:
                 out["Symbol"].str.lower().str.contains(q, na=False)
                 | out["Company Name"].str.lower().str.contains(q, na=False)
             ]
+        if chosen_sectors:
+            out = out[out["Sector"].isin(chosen_sectors)]
+        if chosen_industries:
+            out = out[out["Industry"].isin(chosen_industries)]
         return out, None
+
+    st.sidebar.divider()
 
     change_col = st.sidebar.selectbox(
         "Performance window",
@@ -182,17 +201,6 @@ def sidebar_filters(df: pd.DataFrame) -> tuple[pd.DataFrame, str | None]:
         index=available_change_cols.index("% 4w") if "% 4w" in available_change_cols else 0,
         help="Drives the sliders below and the sector / industry rankings.",
     )
-
-    search = st.sidebar.text_input("Search ticker or company", placeholder="e.g. AEHR")
-
-    sectors = sorted(df["Sector"].dropna().unique())
-    chosen_sectors = st.sidebar.multiselect("Sector", sectors, default=[])
-
-    scoped = df[df["Sector"].isin(chosen_sectors)] if chosen_sectors else df
-    industries = sorted(scoped["Industry"].dropna().unique())
-    chosen_industries = st.sidebar.multiselect("Industry", industries, default=[])
-
-    st.sidebar.divider()
 
     # Performance range
     series = df[change_col].replace([np.inf, -np.inf], np.nan).dropna()
