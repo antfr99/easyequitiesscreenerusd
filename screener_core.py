@@ -80,6 +80,41 @@ def make_session():
 # Universe
 # --------------------------------------------------------------------------
 
+def find_universe_csv(root: Path, data_dir: Path | None = None) -> tuple[Path | None, list[str]]:
+    """
+    Look for the universe CSV in data/ and the repo root.
+
+    Returns (path, notes). path is None if nothing matched; notes explains
+    why, so a caller can show something more useful than "not found" —
+    e.g. a CSV existed but was missing the Industry column, or every column
+    check failed because of encoding.
+    """
+    notes: list[str] = []
+    candidates: list[Path] = []
+    if data_dir is not None:
+        candidates += sorted(data_dir.glob("*.csv"))
+    candidates += sorted(root.glob("*.csv"))
+
+    if not candidates:
+        notes.append(f"No .csv files found under {data_dir or root} or {root}.")
+        return None, notes
+
+    for path in candidates:
+        try:
+            head = pd.read_csv(path, nrows=1, encoding="utf-8-sig")
+        except Exception as exc:
+            notes.append(f"{path.name}: could not be read ({exc}).")
+            continue
+
+        cols = {c.strip().lstrip("\ufeff") for c in head.columns}
+        missing = set(REQUIRED_COLUMNS[:3]) - cols  # Symbol, Sector, Industry
+        if not missing:
+            return path, notes
+        notes.append(f"{path.name}: found columns {sorted(cols)}, missing {sorted(missing)}.")
+
+    return None, notes
+
+
 def normalise_symbol(symbol: str) -> str:
     """
     EasyEquities uses dots for share classes (BRK.B); Yahoo uses dashes.
@@ -88,16 +123,41 @@ def normalise_symbol(symbol: str) -> str:
     return s.replace(".", "-")
 
 
-def load_universe(path: str | Path) -> pd.DataFrame:
+def load_universe(path: str | Path) -> tuple[pd.DataFrame, list[str]]:
     """
     Load the ticker list CSV.
 
     Only Symbol / Sector / Industry / Company Name are required. Any other
     columns in the export (Trade Date, Purchase Price, Quantity) are dropped,
     since they describe a holding rather than the universe.
+
+    Real EasyEquities exports sometimes have a row with an extra unquoted
+    comma (usually a company name like "Smith, Jones & Co" typed straight
+    into Excel without quotes), which throws off the column count for that
+    one line. Rather than let the whole load crash on one bad row, we skip
+    it and report exactly what was dropped so it can be fixed at the source.
+
+    Returns (dataframe, skipped_rows) where skipped_rows is a list of short
+    descriptions of any row that couldn't be parsed.
     """
-    df = pd.read_csv(path)
-    df.columns = [c.strip() for c in df.columns]
+    skipped: list[str] = []
+
+    def _on_bad_line(bad_line: list[str]) -> None:
+        skipped.append(",".join(bad_line))
+        return None  # drop it
+
+    try:
+        df = pd.read_csv(
+            path, encoding="utf-8-sig", on_bad_lines=_on_bad_line, engine="python"
+        )
+    except UnicodeDecodeError:
+        # Excel "CSV (Comma delimited)" on Windows sometimes writes
+        # cp1252 instead of UTF-8 (curly quotes, em dashes in names).
+        df = pd.read_csv(
+            path, encoding="cp1252", on_bad_lines=_on_bad_line, engine="python"
+        )
+
+    df.columns = [c.strip().lstrip("\ufeff") for c in df.columns]
 
     missing = [c for c in REQUIRED_COLUMNS if c not in df.columns]
     if missing:
@@ -114,8 +174,13 @@ def load_universe(path: str | Path) -> pd.DataFrame:
         df.loc[df[col] == "", col] = "Unknown"
 
     df = df[df["Symbol"].str.len() > 0]
+
+    dupes = df.loc[df.duplicated(subset="Symbol", keep=False), "Symbol"].unique().tolist()
+    if dupes:
+        skipped.append(f"Duplicate symbol(s) kept first occurrence only: {', '.join(dupes)}")
     df = df.drop_duplicates(subset="Symbol").reset_index(drop=True)
-    return df
+
+    return df, skipped
 
 
 # --------------------------------------------------------------------------
@@ -291,17 +356,34 @@ def compute_metrics(sym: str, ohlcv: pd.DataFrame) -> dict | None:
     return row
 
 
+EMPTY_METRIC_COLUMNS = [
+    "Close", "As Of", "Bars",
+    "Close 1w ago", "% 1w", "Close 4w ago", "% 4w", "Close 13w ago", "% 13w",
+    "Close 26w ago", "% 26w", "Close 52w ago", "% 52w", "% 1d",
+    "SMA20", "% vs SMA20", "SMA50", "% vs SMA50", "SMA200", "% vs SMA200",
+    "52w High", "52w Low", "% off 52w High", "% above 52w Low",
+    "Volatility 1m %", "Avg Volume 20d", "Avg $ Volume 20d",
+]
+
+
 def build_metrics_frame(
     universe: pd.DataFrame,
     frames: dict[str, pd.DataFrame],
 ) -> pd.DataFrame:
     """Join computed metrics back onto the universe (Sector / Industry / Name)."""
     rows = [m for sym, f in frames.items() if (m := compute_metrics(sym, f)) is not None]
+
+    if not rows:
+        # Every download failed — still return every column the UI expects,
+        # filled with NaN, so filters and the table degrade gracefully
+        # instead of raising KeyError on a missing column.
+        out = universe.copy()
+        for col in EMPTY_METRIC_COLUMNS:
+            out[col] = np.nan
+        out["Yahoo"] = "https://finance.yahoo.com/quote/" + out["Symbol"]
+        return out
+
     metrics = pd.DataFrame(rows)
-
-    if metrics.empty:
-        return universe.assign(Close=np.nan)
-
     out = universe.merge(metrics, on="Symbol", how="left")
     out["Yahoo"] = "https://finance.yahoo.com/quote/" + out["Symbol"]
     return out
