@@ -142,27 +142,55 @@ def ticker_column_config() -> dict:
 # Sidebar filters
 # --------------------------------------------------------------------------
 
-def _load_sectors(csv_path: Path, targets: list[str], base: pd.DataFrame) -> None:
-    """Download prices for the given sectors, merge into base, and rerun."""
+def _load_scope(csv_path: Path, scope: pd.DataFrame, base: pd.DataFrame) -> None:
+    """
+    Download prices for exactly the tickers in `scope` and merge into base.
+
+    `scope` is whatever the sidebar's current Sector/Industry selection
+    resolves to — it may be a whole sector or a single industry within it.
+    Loading only ever fetches this exact set, never a wider one; which
+    tickers have been fetched is tracked at the symbol level (not by
+    sector), so picking a narrower Industry after a broader Sector never
+    re-downloads more than the gap.
+    """
     universe_all, _errors, _notes = core.load_universe(str(csv_path))
-    subset = universe_all[universe_all["Sector"].isin(targets)]
-    with st.spinner(f"Downloading {len(subset)} tickers in {', '.join(targets)}…"):
+    symbols = scope["Symbol"].tolist()
+    with st.spinner(f"Downloading {len(symbols)} ticker(s)…"):
         frames = core.download_prices(
-            subset["Symbol"].tolist(),
+            symbols,
             days=core.DEFAULT_HISTORY_DAYS,
             session=get_session(),
         )
         merged = core.merge_metrics(base, universe_all, frames)
-    loaded = st.session_state.get("loaded_sectors", [])
+    loaded = set(st.session_state.get("loaded_symbols", []))
     st.session_state["live_df"] = merged
-    st.session_state["loaded_sectors"] = loaded + [t for t in targets if t not in loaded]
+    st.session_state["loaded_symbols"] = sorted(loaded | set(symbols))
     st.session_state["live_errors"] = _errors
     st.session_state["live_notes"] = _notes
     st.session_state["live_source"] = (
         f"Live pull {datetime.now(timezone.utc):%Y-%m-%d %H:%M UTC} — "
-        f"{len(st.session_state['loaded_sectors'])} sector(s)"
+        f"{len(st.session_state['loaded_symbols'])} ticker(s) loaded"
     )
     st.rerun()
+
+
+_FILTER_BUTTON_CSS = """
+<style>
+div[class*="st-key-filter_scope_btn"] button {
+    background-color: #cfe8fb;
+    color: #0b4f79;
+    border: 1px solid #9cc9e8;
+}
+div[class*="st-key-filter_scope_btn"] button:hover {
+    background-color: #b8ddf6;
+    color: #0b4f79;
+    border-color: #7fb3d5;
+}
+div[class*="st-key-filter_scope_btn"] button:active {
+    background-color: #a5d2f2;
+}
+</style>
+"""
 
 
 def sidebar_filters(
@@ -177,30 +205,42 @@ def sidebar_filters(
     sectors = sorted(df["Sector"].dropna().unique())
     chosen_sectors = st.sidebar.multiselect("Sector", sectors, default=[])
 
-    # On-demand loading lives right under the Sector picker: if a chosen
-    # sector's prices aren't loaded yet, offer to load exactly those. This
-    # unifies "which sector to load" and "which sector to view" into one
-    # control instead of a separate loader panel.
-    if no_snapshot and csv_path is not None:
-        loaded = st.session_state.get("loaded_sectors", [])
-        to_load = [s for s in chosen_sectors if s not in loaded]
-        if to_load:
-            if st.sidebar.button(
-                f"⬇ Load prices for {len(to_load)} selected sector(s)",
-                type="primary",
-                use_container_width=True,
-            ):
-                _load_sectors(csv_path, to_load, df)
-        elif not chosen_sectors and not loaded:
-            st.sidebar.caption("Select a sector above, then load its prices.")
-        if loaded:
-            st.sidebar.caption("Loaded: " + ", ".join(loaded))
-
     # Industry list is scoped to the chosen sector(s): pick Financials and
     # only Financials industries appear. With no sector chosen, all show.
     scoped = df[df["Sector"].isin(chosen_sectors)] if chosen_sectors else df
     industries = sorted(scoped["Industry"].dropna().unique())
     chosen_industries = st.sidebar.multiselect("Industry", industries, default=[])
+
+    # Loading lives below both pickers and respects both: selecting an
+    # Industry narrows the download to that industry, not the whole sector.
+    if no_snapshot and csv_path is not None:
+        loaded_symbols = set(st.session_state.get("loaded_symbols", []))
+        current_scope = df
+        if chosen_sectors:
+            current_scope = current_scope[current_scope["Sector"].isin(chosen_sectors)]
+        if chosen_industries:
+            current_scope = current_scope[current_scope["Industry"].isin(chosen_industries)]
+
+        if chosen_sectors or chosen_industries:
+            to_load = current_scope[~current_scope["Symbol"].isin(loaded_symbols)]
+            st.sidebar.markdown(_FILTER_BUTTON_CSS, unsafe_allow_html=True)
+            if len(to_load) > 0:
+                if st.sidebar.button(
+                    "Filter Sector/Industries",
+                    key="filter_scope_btn",
+                    use_container_width=True,
+                ):
+                    _load_scope(csv_path, to_load, df)
+                st.sidebar.caption(
+                    f"{len(to_load)} of {len(current_scope)} ticker(s) in this "
+                    "selection still need prices."
+                )
+            else:
+                st.sidebar.success(f"All {len(current_scope)} ticker(s) in this selection are loaded.")
+        elif loaded_symbols:
+            st.sidebar.caption(f"{len(loaded_symbols)} ticker(s) loaded so far.")
+        else:
+            st.sidebar.caption("Select a sector or industry above, then load its prices.")
 
     available_change_cols = [c for c in CHANGE_COLS if c in df.columns]
     has_prices = bool(available_change_cols) and df["Close"].notna().any()
@@ -442,18 +482,16 @@ def main() -> None:
     no_snapshot = not SNAPSHOT.exists()
 
     if no_snapshot:
-        loaded_sectors = st.session_state.get("loaded_sectors", [])
-        universe_all, _e, _n = core.load_universe(str(csv_path))
-        all_sectors = sorted(universe_all["Sector"].dropna().unique())
-        if len(loaded_sectors) < len(all_sectors):
+        loaded_symbols = st.session_state.get("loaded_symbols", [])
+        if not loaded_symbols:
             st.info(
-                "No daily snapshot yet, so prices load on demand. Pick one or "
-                "more sectors in the left sidebar and load them — they accumulate. "
+                "No daily snapshot yet, so prices load on demand. Pick a sector "
+                "and/or industry in the left sidebar and load them — they accumulate. "
                 "This is a personal hobby project and is **not affiliated with, "
                 "endorsed by, or connected to EasyEquities** in any way.",
                 icon="⏳",
             )
-        elif loaded_sectors:
+        else:
             st.caption(
                 "Not affiliated with, endorsed by, or connected to EasyEquities — "
                 "a personal hobby project."
@@ -504,12 +542,12 @@ def main() -> None:
         st.divider()
         if "live_df" in st.session_state:
             if st.button("Clear loaded prices"):
-                for k in ("live_df", "live_source", "live_errors", "live_notes", "loaded_sectors"):
+                for k in ("live_df", "live_source", "live_errors", "live_notes", "loaded_symbols"):
                     st.session_state.pop(k, None)
                 st.rerun()
         if st.button("Clear cache and reload"):
             st.cache_data.clear()
-            for k in ("live_df", "live_source", "live_errors", "live_notes", "loaded_sectors"):
+            for k in ("live_df", "live_source", "live_errors", "live_notes", "loaded_symbols"):
                 st.session_state.pop(k, None)
             st.rerun()
 
