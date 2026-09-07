@@ -1,0 +1,69 @@
+name: Refresh price snapshot
+
+on:
+  schedule:
+    # 22:30 UTC on weekdays (00:30 SAST) — after the US close at 21:00 UTC.
+    # GitHub cron is always UTC and can be delayed by a few minutes under load.
+    - cron: "30 22 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      shard:
+        description: 'Fetch part of the universe only, as i/n (e.g. "2/4"). Leave blank for all.'
+        type: string
+        default: ""
+      with_fundamentals:
+        description: "Also fetch market cap / P/E (slow, ~10 min)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: snapshot
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build snapshot
+        run: |
+          python scripts/build_snapshot.py \
+            ${{ inputs.shard && format('--shard {0}', inputs.shard) || '' }} \
+            ${{ inputs.with_fundamentals && '--with-fundamentals' || '' }}
+
+      - name: Job summary
+        if: always()
+        run: |
+          if [ -f data/snapshot_meta.json ]; then
+            echo '### Snapshot' >> $GITHUB_STEP_SUMMARY
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            head -c 2000 data/snapshot_meta.json >> $GITHUB_STEP_SUMMARY
+            echo '' >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/snapshot.parquet data/snapshot_meta.json
+          if git diff --staged --quiet; then
+            echo "No change."
+          else
+            git commit -m "data: refresh snapshot $(date -u +%Y-%m-%d)"
+            git push
+          fi
