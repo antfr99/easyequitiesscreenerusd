@@ -406,43 +406,61 @@ def main() -> None:
     prices_loaded = df["Close"].notna().any()
     no_snapshot = not SNAPSHOT.exists()
 
-    if no_snapshot and not prices_loaded:
-        st.warning(
-            "No daily snapshot is committed yet, so prices aren't loaded. "
-            "You can browse the universe below, or pull live prices now. "
-            "A full pull of the whole universe can be slow and may get "
-            "throttled by Yahoo on Streamlit's shared servers — for a quick "
-            "look, load a smaller sample first.",
-            icon="⏳",
-        )
-        c1, c2 = st.columns([1, 2])
-        with c1:
-            sample = st.selectbox(
-                "How many to load",
-                ["First 50", "First 200", "Whole universe"],
-                index=0,
+    if no_snapshot:
+        loaded_sectors = st.session_state.get("loaded_sectors", [])
+        universe_all, _ = core.load_universe(str(csv_path))
+        all_sectors = sorted(universe_all["Sector"].dropna().unique())
+        remaining = [s for s in all_sectors if s not in loaded_sectors]
+
+        with st.container():
+            st.warning(
+                "No daily snapshot is committed yet, so prices load on demand. "
+                "Pick a sector and load it — each is a small, fast pull that's "
+                "far less likely to be throttled than the whole universe at once. "
+                "Load as many sectors as you like; they accumulate.",
+                icon="⏳",
             )
-        with c2:
-            st.write("")
-            st.write("")
-            if st.button("Load live prices now", type="primary"):
-                limit = {"First 50": 50, "First 200": 200, "Whole universe": None}[sample]
-                with st.spinner("Downloading prices from Yahoo…"):
-                    universe, skipped = core.load_universe(str(csv_path))
-                    if limit:
-                        universe = universe.head(limit)
+            c1, c2 = st.columns([2, 1])
+            with c1:
+                if remaining:
+                    sector_to_load = st.selectbox(
+                        "Sector to load",
+                        remaining,
+                        help=f"{len(loaded_sectors)} of {len(all_sectors)} sectors loaded so far.",
+                    )
+                else:
+                    sector_to_load = None
+                    st.success("All sectors loaded.")
+            with c2:
+                st.write("")
+                st.write("")
+                load_all = st.button("Load ALL remaining", help="Slower; may be throttled.")
+
+            if loaded_sectors:
+                st.caption("Loaded: " + ", ".join(loaded_sectors))
+
+            targets: list[str] = []
+            if sector_to_load and st.button(f"Load {sector_to_load}", type="primary"):
+                targets = [sector_to_load]
+            elif load_all and remaining:
+                targets = remaining
+
+            if targets:
+                base = df.copy()
+                subset = universe_all[universe_all["Sector"].isin(targets)]
+                with st.spinner(f"Downloading {len(subset)} tickers in {', '.join(targets)}…"):
                     frames = core.download_prices(
-                        universe["Symbol"].tolist(),
+                        subset["Symbol"].tolist(),
                         days=core.DEFAULT_HISTORY_DAYS,
                         session=get_session(),
                     )
-                    full, _ = core.load_universe(str(csv_path))
-                    st.session_state["live_df"] = core.build_metrics_frame(full, frames)
-                    st.session_state["live_source"] = (
-                        f"Live pull {datetime.now(timezone.utc):%Y-%m-%d %H:%M UTC} "
-                        f"({sample.lower()})"
-                    )
-                    st.session_state["live_warnings"] = skipped
+                    merged = core.merge_metrics(base, universe_all, frames)
+                st.session_state["live_df"] = merged
+                st.session_state["loaded_sectors"] = loaded_sectors + targets
+                st.session_state["live_source"] = (
+                    f"Live pull {datetime.now(timezone.utc):%Y-%m-%d %H:%M UTC} — "
+                    f"{len(loaded_sectors) + len(targets)} sector(s)"
+                )
                 st.rerun()
 
     if csv_warnings:
@@ -486,12 +504,12 @@ def main() -> None:
         st.divider()
         if "live_df" in st.session_state:
             if st.button("Clear loaded prices"):
-                for k in ("live_df", "live_source", "live_warnings"):
+                for k in ("live_df", "live_source", "live_warnings", "loaded_sectors"):
                     st.session_state.pop(k, None)
                 st.rerun()
         if st.button("Clear cache and reload"):
             st.cache_data.clear()
-            for k in ("live_df", "live_source", "live_warnings"):
+            for k in ("live_df", "live_source", "live_warnings", "loaded_sectors"):
                 st.session_state.pop(k, None)
             st.rerun()
 
