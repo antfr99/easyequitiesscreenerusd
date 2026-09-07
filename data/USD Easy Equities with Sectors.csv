@@ -1,4 +1,48 @@
 Symbol,Trade Date,Purchase Price,Quantity,Sector,Industry,Company Name
+TXG,2026-09-07,62.68,1,Healthcare,Life Sciences Tools & Services,10x Genomics Inc.
+VNET,2026-09-07,6.36,1,Information Technology,IT Services,VNET Group Inc.
+DDD,2026-09-07,3.46,1,Technology,Computer Hardware,3D Systems Corporation
+MMM,2026-09-07,168.48,1,Industrials,Industrial Conglomerates,3M Company
+COE,2026-09-07,14.02,1,Consumer Discretionary,Diversified Consumer Services,51Talk Online Education Group
+AAON,2026-09-07,79.39,1,Industrials,Building Products,AAON Inc.
+ACM,2026-09-07,66.64,1,Industrials,Construction & Engineering,AECOM
+AGNC,2026-09-07,10.65,1,Real Estate,Mortgage REITs,AGNC Investment Corp.
+ALGN,2026-09-07,158.76,1,Healthcare,Health Care Equipment & Supplies,Align Technology Inc.
+AME,2026-09-07,237.96,1,Industrials,Electrical Equipment,AMETEK Inc.
+ARM,2026-09-07,251.94,1,Information Technology,Semiconductors,Arm Holdings PLC
+ASPI,2026-09-07,4.21,1,Materials,Specialty Chemicals,ASP Isotopes Inc.
+ASTS,2026-09-07,62.30,1,Telecommunications,Wireless Telecommunication Services,AST SpaceMobile Inc.
+ABT,2026-09-07,108.24,1,Healthcare,Health Care Equipment & Supplies,Abbott Laboratories
+ABBV,2026-09-07,255.73,1,Healthcare,Biotechnology,AbbVie Inc.
+ACN,2026-09-07,186.56,1,Information Technology,IT Services & Consulting,Accenture plc
+GOLF,2026-09-07,86.78,1,Consumer Discretionary,Leisure Products,Acushnet Holdings Corp.
+ADBE,2026-09-07,266.50,1,Information Technology,Software,Adobe Inc.
+INVST,2026-09-07,2295.78,1,Financials,Asset Management & Banking,Investec Structured Products
+AMD,2026-09-07,477.50,1,Information Technology,Semiconductors,Advanced Micro Devices Inc.
+AEHR,2026-09-07,86.22,1,Information Technology,Semiconductor Equipment,Aehr Test Systems
+AER,2026-09-07,145.53,1,Industrials,Trading Companies & Distributors,AerCap Holdings NV
+AVAV,2026-09-07,144.38,1,Industrials,Aerospace & Defense,AeroVironment Inc.
+AFRM,2026-09-07,72.28,1,Financials,Consumer Finance,Affirm Holdings Inc.
+AFL,2026-09-07,117.19,1,Financials,Insurance,Aflac Incorporated
+AEM,2026-09-07,204.79,1,Materials,Metals & Mining,Agnico Eagle Mines Limited
+API,2026-09-07,4.25,1,Information Technology,Software,Agora Inc.
+ADC,2026-09-07,72.66,1,Real Estate,Retail REITs,Agree Realty Corporation
+APD,2026-09-07,301.11,1,Materials,Chemicals,Air Products and Chemicals Inc.
+ABNB,2026-09-07,181.98,1,Consumer Discretionary,Hotels Restaurants & Leisure,Airbnb Inc.
+AKAM,2026-09-07,105.17,1,Information Technology,IT Services,Akamai Technologies Inc.
+ALB,2026-09-07,126.38,1,Materials,Chemicals,Albemarle Corporation
+BABA,2026-09-07,113.13,1,Consumer Discretionary,Broadline Retail,Alibaba Group Holding Limited
+ALL,2026-09-07,259.45,1,Financials,Insurance,The Allstate Corporation
+ALNY,2026-09-07,266.24,1,Healthcare,Biotechnology,Alnylam Pharmaceuticals Inc.
+GOOGL,2026-09-07,338.47,1,Communication Services,Interactive Media & Services,Alphabet Inc. Class A
+GOOG,2026-09-07,335.38,1,Communication Services,Interactive Media & Services,Alphabet Inc. Class C
+AYX,2026-09-07,48.17,1,Information Technology,Software,Alteryx Inc.
+MO,2026-09-07,68.80,1,Consumer Staples,Tobacco,Altria Group Inc.
+AMZN,2026-09-07,258.38,1,Consumer Discretionary,Broadline Retail,Amazon.com Inc.
+AMBA,2026-09-07,62.49,1,Information Technology,Semiconductors,Ambarella Inc.
+AAL,2026-09-07,13.13,1,Industrials,Passenger Airlines,American Airlines Group Inc.
+AEP,2026-09-07,124.55,1,Utilities,Electric Utilities,American Electric Power Company Inc.
+AXP,2026-09-07,326.43,1,Financials,Consumer Finance,American Express Company
 AEHR,2026-09-07,0,1,Information Technology,Semiconductor Equipment,Aehr Test Systems
 AER,2026-09-07,0,1,Industrials,Trading Companies & Distributors,AerCap Holdings NV
 AVAV,2026-09-07,0,1,Industrials,Aerospace & Defense,AeroVironment Inc.
@@ -478,6 +522,30 @@ MGNI,2026-09-07,0,1,Communication Services,Interactive Media & Services,Magnite 
 MAGN,2026-09-07,0,1,Consumer Staples,Packaged Foods & Meats,Magnum Ice Cream Company
 MAIN,2026-09-07,0,1,Financials,Asset Management & Custody Banks,Main Street Capital Corporation
 MBUU,2026-09-07,0,1,Consumer Discretionary,Leisure Products,Malibu Boats Inc.
+MANU,2026-09-07,0,1,Communication Services,Movies & Entertainment,Manchester United plc
+MARA,2026-09-07,0,1,Financials,Financial Exchanges & Data,Marathon Digital Holdings Inc.
+MPC,2026-09-07,0,1,Energy,Oil & Gas Refining & Marketing,Marathon Petroleum Corporation
+MKL,2026-09-07,0,1,Financials,Property & Casualty Insurance,Markel Group Inc.
+MAR,2026-09-07,0,1,Consumer Discretionary,Hotels, Resorts & Cruise Lines,Marriott International Inc.
+MRVL,2026-09-07,0,1,Information Technology,Semiconductors,Marvell Technology Inc.
+MA,2026-09-07,0,1,Financials,Transaction & Payment Processing Services,Mastercard Incorporated
+MTCH,2026-09-07,0,1,Communication Services,Interactive Media & Services,Match Group Inc.
+MAT,2026-09-07,0,1,Consumer Discretionary,Leisure Products,Mattel Inc.
+MAXR,2026-09-07,0,1,Industrials,Aerospace & Defense,Maxar Technologies Inc.
+MCK,2026-09-07,0,1,Healthcare,Health Care Distributors,McKesson Corporation
+MCD,2026-09-07,0,1,Consumer Discretionary,Restaurants,McDonald's Corporation
+MDT,2026-09-07,0,1,Healthcare,Health Care Equipment,Medtronic plc
+MELI,2026-09-07,0,1,Consumer Discretionary,Broadline Retail,MercadoLibre Inc.
+MRK,2026-09-07,0,1,Healthcare,Pharmaceuticals,Merck & Co. Inc.
+META,2026-09-07,0,1,Communication Services,Interactive Media & Services,Meta Platforms Inc.
+MET,2026-09-07,0,1,Financials,Life & Health Insurance,MetLife Inc.
+MSTR,2026-09-07,0,1,Information Technology,Application Software,MicroStrategy Incorporated
+MVIS,2026-09-07,0,1,Information Technology,Electronic Equipment & Instruments,MicroVision Inc.
+MCHP,2026-09-07,0,1,Information Technology,Semiconductors,Microchip Technology Incorporated
+MU,2026-09-07,0,1,Information Technology,Semiconductors,Micron Technology Inc.
+MSFT,2026-09-07,0,1,Information Technology,Systems Software,Microsoft Corporation
+MVST,2026-09-07,0,1,Industrials,Electrical Components & Equipment,Microvast Holdings Inc.
+MRNA,2026-09-07,0,1,Healthcare,Biotechnology,Moderna Inc.
 MHK,2026-09-07,0,1,Consumer Discretionary,Home Furnishings,Mohawk Industries Inc.
 TAP,2026-09-07,0,1,Consumer Staples,Brewers,Molson Coors Beverage Company
 MDLZ,2026-09-07,0,1,Consumer Staples,Packaged Foods & Meats,Mondelez International Inc.
