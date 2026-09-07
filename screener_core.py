@@ -27,6 +27,29 @@ REQUIRED_COLUMNS = ["Symbol", "Sector", "Industry", "Company Name"]
 
 TRADING_DAYS = 252  # ~1 year of sessions
 
+# Encodings to try in order. utf-8-sig transparently strips a BOM; cp1252
+# is the usual culprit for a stray 0xe9-type byte from Excel on Windows
+# (accented company names like "Société Générale"); latin-1 accepts any
+# byte at all as a last resort so a load never hard-fails on encoding.
+_ENCODINGS = ["utf-8-sig", "cp1252", "latin-1"]
+
+
+def _read_csv_robust(path, **kwargs) -> pd.DataFrame:
+    """
+    Read a CSV trying several encodings, returning the first that decodes.
+
+    Raises the last UnicodeDecodeError only if every encoding fails, which
+    with latin-1 in the list is effectively never.
+    """
+    last_exc: Exception | None = None
+    for enc in _ENCODINGS:
+        try:
+            return pd.read_csv(path, encoding=enc, **kwargs)
+        except UnicodeDecodeError as exc:
+            last_exc = exc
+            continue
+    raise last_exc  # type: ignore[misc]
+
 # Calendar-day lookbacks. We resolve each to the last trading day on or
 # before (last_date - N days), so holidays and weekends are handled.
 LOOKBACKS = {
@@ -101,7 +124,7 @@ def find_universe_csv(root: Path, data_dir: Path | None = None) -> tuple[Path | 
 
     for path in candidates:
         try:
-            head = pd.read_csv(path, nrows=1, encoding="utf-8-sig")
+            head = _read_csv_robust(path, nrows=1)
         except Exception as exc:
             notes.append(f"{path.name}: could not be read ({exc}).")
             continue
@@ -147,15 +170,11 @@ def load_universe(path: str | Path) -> tuple[pd.DataFrame, list[str]]:
         return None  # drop it
 
     try:
-        df = pd.read_csv(
-            path, encoding="utf-8-sig", on_bad_lines=_on_bad_line, engine="python"
+        df = _read_csv_robust(
+            path, on_bad_lines=_on_bad_line, engine="python"
         )
-    except UnicodeDecodeError:
-        # Excel "CSV (Comma delimited)" on Windows sometimes writes
-        # cp1252 instead of UTF-8 (curly quotes, em dashes in names).
-        df = pd.read_csv(
-            path, encoding="cp1252", on_bad_lines=_on_bad_line, engine="python"
-        )
+    except Exception as exc:
+        raise ValueError(f"Could not read the CSV: {exc}") from exc
 
     df.columns = [c.strip().lstrip("\ufeff") for c in df.columns]
 
@@ -387,6 +406,41 @@ def build_metrics_frame(
     out = universe.merge(metrics, on="Symbol", how="left")
     out["Yahoo"] = "https://finance.yahoo.com/quote/" + out["Symbol"]
     return out
+
+
+def merge_metrics(
+    base: pd.DataFrame,
+    universe: pd.DataFrame,
+    frames: dict[str, pd.DataFrame],
+) -> pd.DataFrame:
+    """
+    Fold newly-downloaded price frames into an existing metrics table.
+
+    Used for incremental, sector-by-sector loading: `base` is what's already
+    on screen (possibly all-NaN prices), and `frames` are the symbols just
+    fetched. Rows for those symbols get their metrics filled in; every other
+    row is left untouched. Sector / Industry / Company Name always come from
+    `universe` (the CSV), never from the download.
+    """
+    fresh = build_metrics_frame(universe, frames)
+
+    base = base.set_index("Symbol")
+    fresh = fresh.set_index("Symbol")
+
+    metric_cols = [c for c in fresh.columns
+                   if c not in {"Sector", "Industry", "Company Name"}]
+    got = fresh.index[fresh["Close"].notna()]
+
+    for col in metric_cols:
+        # Align the freshly-fetched values (only for rows we got) onto base's
+        # index; rows we didn't fetch stay as whatever base already had.
+        incoming = fresh.loc[got, col].reindex(base.index)
+        if col in base.columns:
+            base[col] = incoming.combine_first(base[col])
+        else:
+            base[col] = incoming
+
+    return base.reset_index()
 
 
 # --------------------------------------------------------------------------
