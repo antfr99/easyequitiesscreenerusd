@@ -161,8 +161,9 @@ def load_universe(path: str | Path) -> tuple[pd.DataFrame, list[str]]:
     see or fix them. Only rows that can't be recovered (two or more extra
     fields, or too few) are reported.
 
-    Returns (dataframe, warnings). warnings lists genuinely unrecoverable
-    rows and duplicate symbols; it's empty in the normal case.
+    Returns (dataframe, errors, notes). errors lists genuinely unparseable
+    rows (the user should fix these); notes lists harmless informational
+    items like duplicate symbols. Both are empty in the normal case.
     """
     warnings: list[str] = []
 
@@ -206,11 +207,15 @@ def load_universe(path: str | Path) -> tuple[pd.DataFrame, list[str]]:
     df = df[df["Symbol"].str.len() > 0]
 
     dupes = df.loc[df.duplicated(subset="Symbol", keep=False), "Symbol"].unique().tolist()
+    notes: list[str] = []
     if dupes:
-        warnings.append(f"Duplicate symbol(s) kept first occurrence only: {', '.join(dupes)}")
+        notes.append(f"Duplicate symbol(s) kept first occurrence only: {', '.join(dupes)}")
     df = df.drop_duplicates(subset="Symbol").reset_index(drop=True)
 
-    return df, warnings
+    # `errors` holds only genuinely unparseable rows (something to fix);
+    # `notes` holds harmless informational items like de-duplication. The
+    # app surfaces them very differently, so keep them separate.
+    return df, warnings, notes
 
 
 # --------------------------------------------------------------------------
