@@ -527,15 +527,15 @@ def main() -> None:
         if not loaded_symbols:
             st.info(
                 "Prices load on demand. Pick a sector and/or industry in the left "
-                "sidebar, then click the load button — selections accumulate. "
+                "sidebar, then click the load button — if you select all then be patient as it could take a few minutes. "
                 "This is a personal hobby project and is **not affiliated with, "
-                "endorsed by, or connected to EasyEquities** in any way.",
+                "endorsed by, or connected to EasyEquities** in any way. - Ticker List last updated 8th September 2026",
                 icon="⏳",
             )
         else:
             st.caption(
                 "Not affiliated with, endorsed by, or connected to EasyEquities — "
-                "a personal hobby project. - Ticker List last updated 8th September 2026"
+                "a personal hobby project."
             )
 
     # Only genuinely unparseable rows get a warning the user should act on.
