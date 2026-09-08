@@ -232,7 +232,7 @@ def sidebar_filters(
             st.sidebar.markdown(_FILTER_BUTTON_CSS, unsafe_allow_html=True)
             if len(to_load) > 0:
                 if st.sidebar.button(
-                    "Filter Sector/Industries",
+                    "Run",
                     key="filter_scope_btn",
                     use_container_width=True,
                 ):
