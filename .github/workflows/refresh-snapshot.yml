@@ -1,27 +1,17 @@
 name: Refresh price snapshot
 
+# Manual only. There is no automatic refresh: the app loads prices on demand
+# from the sidebar, so no scheduled or push-triggered snapshot is built.
+# Run this by hand from the Actions tab if you ever want to rebuild the
+# committed snapshot (e.g. to seed a fast first load).
+
 on:
-  # Automatically rebuild the snapshot when the universe CSV or
-  # snapshot-building code changes.
-  push:
-    paths:
-      - "USD Easy Equities with Sectors.csv"
-      - "scripts/build_snapshot.py"
-      - "screener_core.py"
-
-  # Continue doing the normal daily price refresh.
-  schedule:
-    # 22:30 UTC on weekdays = 00:30 SAST
-    - cron: "30 22 * * 1-5"
-
-  # Allows you to manually run the workflow from GitHub Actions.
   workflow_dispatch:
     inputs:
       shard:
         description: 'Fetch part of the universe only, as i/n (e.g. "2/4"). Leave blank for all.'
         type: string
         default: ""
-
       with_fundamentals:
         description: "Also fetch market cap / P/E (slow, ~10 min)"
         type: boolean
@@ -37,45 +27,27 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     timeout-minutes: 45
-
     steps:
-
-      # ------------------------------------------------------------
-      # 1. Get the latest version of the repository
-      # ------------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ------------------------------------------------------------
-      # 2. Set up Python
-      # ------------------------------------------------------------
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
 
-      # ------------------------------------------------------------
-      # 3. Install Python dependencies
-      # ------------------------------------------------------------
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
 
-      # ------------------------------------------------------------
-      # 4. Build the snapshot
-      # ------------------------------------------------------------
       - name: Build snapshot
         run: |
           python scripts/build_snapshot.py \
             ${{ inputs.shard && format('--shard {0}', inputs.shard) || '' }} \
             ${{ inputs.with_fundamentals && '--with-fundamentals' || '' }}
 
-      # ------------------------------------------------------------
-      # 5. Display snapshot information in GitHub Actions
-      # ------------------------------------------------------------
       - name: Job summary
         if: always()
         run: |
@@ -89,44 +61,31 @@ jobs:
             echo "snapshot_meta.json was not created."
           fi
 
-      # ------------------------------------------------------------
-      # 6. Show how many rows are in the snapshot
-      # ------------------------------------------------------------
       - name: Verify snapshot
         run: |
           if [ ! -f data/snapshot.parquet ]; then
             echo "ERROR: data/snapshot.parquet was not created."
             exit 1
           fi
-
           if [ ! -f data/snapshot_meta.json ]; then
             echo "ERROR: data/snapshot_meta.json was not created."
             exit 1
           fi
-
           echo "Snapshot successfully created."
-
           python - <<'PY'
           import pandas as pd
           import json
-
           df = pd.read_parquet("data/snapshot.parquet")
-
           print(f"Snapshot rows: {len(df):,}")
           print(f"Snapshot columns: {len(df.columns):,}")
-
           if "Symbol" in df.columns:
               print(f"Unique symbols: {df['Symbol'].nunique():,}")
-
           if "Sector" in df.columns:
               print(f"Sectors: {df['Sector'].nunique():,}")
-
           if "Industry" in df.columns:
               print(f"Industries: {df['Industry'].nunique():,}")
-
           with open("data/snapshot_meta.json", "r") as f:
               meta = json.load(f)
-
           print(f"Universe size: {meta.get('universe_size')}")
           print(f"Symbols fetched: {meta.get('symbols_fetched_this_run')}")
           print(f"Symbols with data: {meta.get('symbols_with_data')}")
@@ -134,16 +93,11 @@ jobs:
           print(f"Built at: {meta.get('built_at')}")
           PY
 
-      # ------------------------------------------------------------
-      # 7. Commit the new snapshot back to GitHub
-      # ------------------------------------------------------------
       - name: Commit snapshot if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
           git add data/snapshot.parquet data/snapshot_meta.json
-
           if git diff --staged --quiet; then
             echo "No snapshot changes to commit."
           else
