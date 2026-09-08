@@ -226,7 +226,7 @@ def sidebar_filters(
             st.sidebar.markdown(_FILTER_BUTTON_CSS, unsafe_allow_html=True)
             if len(to_load) > 0:
                 if st.sidebar.button(
-                    "Run",
+                    "Filter Sector/Industries",
                     key="filter_scope_btn",
                     use_container_width=True,
                 ):
@@ -459,14 +459,6 @@ def group_view(df: pd.DataFrame, level: str, change_col: str | None) -> None:
 def main() -> None:
     st.title("📈 EasyEquities USD Equity Screener")
 
-    st.warning(
-        "Please note: Running all or a large number of tickers may take a few minutes to complete. "
-        "Data is sourced from external providers and may contain missing values. "
-        "This screener is a personal data hobby project and is not intended to provide financial "
-        "advice or investment recommendations.",
-        icon="⚠️",
-    )
-
     csv_path, notes = core.find_universe_csv(ROOT, DATA_DIR)
     if csv_path is None:
         st.error(
@@ -514,6 +506,10 @@ def main() -> None:
             )
             for w in csv_errors:
                 st.write("•", w)
+
+    # Duplicates and other housekeeping are informational, not problems.
+    if csv_notes:
+        st.caption(" · ".join(csv_notes))
 
     filtered, change_col = sidebar_filters(df, csv_path, no_snapshot)
 
