@@ -10,9 +10,9 @@ streamlit_app.py                     the app
 screener_core.py                     shared data layer (no Streamlit imports)
 scripts/build_snapshot.py            builds data/snapshot.parquet
 data/USD Easy Equities with Sectors.csv   universe: Symbol, Sector, Industry, Company Name
-data/snapshot.parquet                generated — the app reads this
+data/snapshot.parquet                generated — optional, ignored by default (see below)
 data/snapshot_meta.json              generated — build time and coverage
-.github/workflows/refresh-snapshot.yml    daily rebuild
+.github/workflows/refresh-snapshot.yml    manual rebuild (workflow_dispatch only)
 requirements.txt
 ```
 
@@ -20,14 +20,29 @@ requirements.txt
 
 ```bash
 pip install -r requirements.txt
-python scripts/build_snapshot.py --limit 25   # quick smoke test
 streamlit run streamlit_app.py
 ```
 
-Without a snapshot the app falls back to a live pull, cached for an hour.
-That's fine for a handful of tickers and slow for the full universe.
+The app runs on demand and needs no snapshot. If you want to build one
+anyway (to test the pipeline or to seed instant loads):
 
-## Why a snapshot instead of live calls
+```bash
+python scripts/build_snapshot.py --limit 25   # quick smoke test
+```
+
+By default the app loads prices **on demand**: it opens instantly with the
+bare universe (no prices, no network call), and you pull prices from the
+sidebar by picking a sector and/or industry and clicking the load button.
+Selections accumulate across the session. This is controlled by the
+`USE_ON_DEMAND_ONLY = True` switch near the top of `streamlit_app.py`.
+
+That's fine for a handful of tickers at a time and slow for the full
+universe, since a large selection triggers a live Yahoo pull on Streamlit
+Cloud's shared IP. If you'd rather have instant full-universe loads, set
+`USE_ON_DEMAND_ONLY = False`, build a snapshot (below), and commit it — the
+app will then read `data/snapshot.parquet` instead.
+
+## The snapshot (optional)
 
 Yahoo rate limits by IP. `yf.download` issues one request per symbol even
 when you pass a list, so the full universe is ~863 requests, and users have
@@ -40,7 +55,7 @@ reported 429s in that same range. Three things keep this workable:
 3. **Carry-forward** — symbols that still fail keep their previous values
    and are flagged `Stale`, so a throttled run degrades instead of breaking.
 
-If the nightly run gets throttled consistently, split it:
+If a manual build gets throttled, split it:
 
 ```bash
 python scripts/build_snapshot.py --shard 1/4    # then 2/4, 3/4, 4/4
@@ -48,9 +63,12 @@ python scripts/build_snapshot.py --shard 1/4    # then 2/4, 3/4, 4/4
 
 Each shard refreshes a quarter of the universe and leaves the rest intact.
 
-Note that GitHub Actions runners use shared datacenter IPs, which Yahoo
-throttles more aggressively than a home connection. If CI keeps coming back
-half-empty, run `build_snapshot.py` on a local schedule and push the parquet
+The `refresh-snapshot.yml` workflow is **manual only** (`workflow_dispatch`)
+— there is no scheduled or push-triggered rebuild, since the app loads
+prices on demand. You can still trigger a build by hand from the Actions
+tab. Note that GitHub Actions runners use shared datacenter IPs, which Yahoo
+throttles more aggressively than a home connection, so if a CI build comes
+back half-empty, run `build_snapshot.py` locally and push the parquet
 instead.
 
 ## Sector and industry
@@ -71,7 +89,8 @@ Lookbacks resolve to the last trading day on or before the target date, so
 the "4 weeks ago" close is a real close and not a holiday gap.
 
 Market cap, P/E and dividend yield need `Ticker.info`, so they're opt-in via
-`--with-fundamentals` and only ever run inside the scheduled job.
+`--with-fundamentals` and only ever run inside a manual `build_snapshot.py`
+build (never on demand in the app).
 
 ## Branch workflow
 
