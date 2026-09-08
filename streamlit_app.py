@@ -412,6 +412,41 @@ def ticker_view(df: pd.DataFrame, change_col: str | None) -> None:
             st.bar_chart(bottom.set_index("Symbol"), horizontal=True)
 
 
+def no_data_view(df: pd.DataFrame) -> None:
+    st.subheader("No Data")
+
+    cols = [c for c in ["Symbol", "Company Name", "Sector", "Industry", "Yahoo"] if c in df.columns]
+    missing = df.loc[df["Close"].isna(), cols].sort_values("Symbol")
+
+    st.caption(
+        f"{len(missing)} ticker(s) returned no price data — usually delistings, "
+        "ticker changes, or share classes Yahoo spells differently."
+    )
+
+    if missing.empty:
+        st.success("Every ticker in the universe has price data.")
+        return
+
+    col_cfg = {}
+    if "Yahoo" in missing.columns:
+        col_cfg["Yahoo"] = st.column_config.LinkColumn("Chart", display_text="open")
+
+    st.dataframe(
+        missing,
+        column_config=col_cfg,
+        hide_index=True,
+        width="stretch",
+        height=560,
+    )
+
+    st.download_button(
+        "Download tickers with no data (CSV)",
+        missing.to_csv(index=False).encode("utf-8"),
+        file_name="screener_no_data.csv",
+        mime="text/csv",
+    )
+
+
 def group_view(df: pd.DataFrame, level: str, change_col: str | None) -> None:
     st.subheader(level)
 
@@ -530,13 +565,15 @@ def main() -> None:
             "ticker changes, or share classes Yahoo spells differently."
         )
 
-    tab_t, tab_s, tab_i = st.tabs(["Tickers", "Sectors", "Industries"])
+    tab_t, tab_s, tab_i, tab_nd = st.tabs(["Tickers", "Sectors", "Industries", "No Data"])
     with tab_t:
         ticker_view(filtered, change_col)
     with tab_s:
         group_view(filtered, "Sector", change_col)
     with tab_i:
         group_view(filtered, "Industry", change_col)
+    with tab_nd:
+        no_data_view(df)
 
     with st.sidebar:
         st.divider()
