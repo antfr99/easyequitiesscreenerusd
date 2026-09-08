@@ -95,7 +95,6 @@ TEAM,Atlassian Corporation,Information Technology,Application Software,2026-09-0
 ADSK,Autodesk Inc.,Information Technology,Application Software,2026-09-07,0,0
 ADP,Automatic Data Processing Inc.,Industrials,Human Resource & Employment Services,2026-09-07,0,0
 AZO,AutoZone Inc.,Consumer Discretionary,Automotive Retail,2026-09-07,0,0
-AVUV,Avantis US Small Cap Value ETF,Financials,Exchange Traded Funds,2026-09-07,0,0
 AXON,Axon Enterprise Inc.,Industrials,Aerospace & Defense,2026-09-07,0,0
 BTG,B2Gold Corp.,Materials,Gold,2026-09-07,0,0
 BIDU,Baidu Inc.,Communication Services,Interactive Media & Services,2026-09-07,0,0
@@ -104,7 +103,6 @@ BAND,Bandwidth Inc.,Communication Services,Alternative Carriers,2026-09-07,0,0
 BAC,Bank of America Corporation,Financials,Diversified Banks,2026-09-07,0,0
 BZUN,Baozun Inc.,Consumer Discretionary,Broadline Retail,2026-09-07,0,0
 BCS,Barclays PLC,Financials,Diversified Banks,2026-09-07,0,0
-FOFO,Baron First Principles ETF,Financials,Exchange Traded Funds,2026-09-07,0,0
 GOLD,Barrick Mining Corp,Materials,Gold,2026-09-07,0,0
 BHC,Bausch Health Companies Inc.,Healthcare,Pharmaceuticals,2026-09-07,0,0
 BEAM,Beam Therapeutics Inc.,Healthcare,Biotechnology,2026-09-07,0,0
@@ -128,7 +126,7 @@ BB,BlackBerry Limited,Information Technology,Systems Software,2026-09-07,0,0
 BLK,BlackRock Inc.,Financials,Asset Management & Custody Banks,2026-09-07,0,0
 BX,Blackstone Inc.,Financials,Asset Management & Custody Banks,2026-09-07,0,0
 BLNK,Blink Charging Co.,Consumer Discretionary,Automotive Parts & Equipment,2026-09-07,0,0
-SQ,Block Inc.,Financials,Transaction & Payment Processing Services,2026-09-07,0,0
+XYZ,Block Inc.,Financials,Transaction & Payment Processing Services,2026-09-07,0,0
 BE,Bloom Energy Corporation,Industrials,Electrical Components & Equipment,2026-09-07,0,0
 BWA,BorgWarner Inc.,Consumer Discretionary,Automotive Parts & Equipment,2026-09-07,0,0
 BOC,Boston Omaha Corporation,Financials,Multi-Sector Holdings,2026-09-07,0,0
@@ -150,7 +148,7 @@ BG,Bunge Global SA,Consumer Staples,Agricultural Products & Services,2026-09-07,
 BWXT,BWX Technologies Inc.,Industrials,Aerospace & Defense,2026-09-07,0,0
 AI,C3.ai Inc.,Information Technology,Application Software,2026-09-07,0,0
 CDNS,Cadence Design Systems Inc.,Information Technology,Application Software,2026-09-07,0,0
-MODG,Callaway Golf Company,Consumer Discretionary,Leisure Products,2026-09-07,0,0
+CALY,Callaway Golf Company,Consumer Discretionary,Leisure Products,2026-09-07,0,0
 CCJ,Cameco Corporation,Energy,Uranium,2026-09-07,0,0
 CPB,Campbell Soup Company,Consumer Staples,Packaged Foods & Meats,2026-09-07,0,0
 CWH,Camping World Holdings Inc.,Consumer Discretionary,Other Specialty Retail,2026-09-07,0,0
@@ -177,12 +175,11 @@ CHKP,Check Point Software Technologies Ltd.,Information Technology,Systems Softw
 LNG,Cheniere Energy Inc.,Energy,Oil & Gas Storage & Transportation,2026-09-07,0,0
 CVX,Chevron Corporation,Energy,Integrated Oil & Gas,2026-09-07,0,0
 CHWY,Chewy Inc.,Consumer Discretionary,Other Specialty Retail,2026-09-07,0,0
-CSB,China Seas Basket Ltd,Financials,Closed-End Funds,2026-09-07,0,0
 CMG,Chipotle Mexican Grill Inc.,Consumer Discretionary,Restaurants,2026-09-07,0,0
 CB,Chubb Limited,Financials,Property & Casualty Insurance,2026-09-07,0,0
 CIEN,Ciena Corporation,Information Technology,Communications Equipment,2026-09-07,0,0
 CTAS,Cintas Corporation,Industrials,Diversified Support Services,2026-09-07,0,0
-CIPH,Cipher Digital Inc.,Information Technology,IT Consulting & Other Services,2026-09-07,0,0
+CIFR,Cipher Digital Inc.,Information Technology,IT Consulting & Other Services,2026-09-07,0,0
 CRCL,Circle Internet Group Inc.,Financials,Transaction & Payment Processing Services,2026-09-07,0,0
 CRUS,Cirrus Logic Inc.,Information Technology,Semiconductors,2026-09-07,0,0
 CSCO,Cisco Systems Inc.,Information Technology,Communications Equipment,2026-09-07,0,0
@@ -239,13 +236,11 @@ DDOG,Datadog Inc.,Information Technology,Application Software,2026-09-07,0,0
 DAVE,Dave Inc.,Financials,Transaction & Payment Processing Services,2026-09-07,0,0
 DECK,Deckers Outdoor Corporation,Consumer Discretionary,Footwear,2026-09-07,0,0
 DE,Deere & Company,Industrials,Agricultural & Farm Machinery,2026-09-07,0,0
-SIXG,Defiance Connective Technologies ETF,Financials,Exchange Traded Funds,2026-09-07,0,0
 DK,Delek US Holdings Inc.,Energy,Oil & Gas Refining & Marketing,2026-09-07,0,0
 DAL,Delta Air Lines Inc.,Industrials,Passenger Airlines,2026-09-07,0,0
 DNN,Denison Mines Corp.,Energy,Uranium,2026-09-07,0,0
 XRAY,DENTSPLY SIRONA Inc.,Healthcare,Health Care Supplies,2026-09-07,0,0
 DM,Desktop Metal Inc.,Industrials,Industrial Machinery,2026-09-07,0,0
-DXYZ,Destiny Tech100 Inc.,Financials,Closed-End Funds,2026-09-07,0,0
 DB,Deutsche Bank Aktiengesellschaft,Financials,Diversified Banks,2026-09-07,0,0
 DVN,Devon Energy Corporation,Energy,Oil & Gas Exploration & Production,2026-09-07,0,0
 DXCM,DexCom Inc.,Healthcare,Health Care Equipment,2026-09-07,0,0
@@ -343,7 +338,6 @@ DNA,Ginkgo Bioworks Holdings Inc.,Healthcare,Biotechnology,2026-09-07,0,0
 GAIN,Gladstone Investment Corporation,Financials,Asset Management & Custody Banks,2026-09-07,0,0
 LAND,Gladstone Land Corporation,Real Estate,Other Specialized REITs,2026-09-07,0,0
 GPN,Global Payments Inc.,Financials,Transaction & Payment Processing Services,2026-09-07,0,0
-URA,Global X Uranium ETF,Financials,Exchange Traded Funds,2026-09-07,0,0
 GLBE,Global-e Online Ltd.,Information Technology,Application Software,2026-09-07,0,0
 GDRX,GoodRx Holdings Inc.,Healthcare,Health Care Services,2026-09-07,0,0
 GPRO,GoPro Inc.,Consumer Discretionary,Consumer Electronics,2026-09-07,0,0
@@ -399,8 +393,6 @@ INTZ,Intruson Inc.,Information Technology,Systems Software,2026-09-07,0,0
 INTU,Intuit Inc.,Information Technology,Application Software,2026-09-07,0,0
 ISRG,Intuitive Surgical Inc.,Healthcare,Health Care Equipment,2026-09-07,0,0
 IVR,Invesco Mortgage Capital Inc.,Real Estate,Mortgage REITs,2026-09-07,0,0
-PRF,Invesco RAFI US 1000 ETF,Financials,Exchange Traded Funds,2026-09-07,0,0
-SPMO,Invesco S&P 500 Momentum ETF,Financials,Exchange Traded Funds,2026-09-07,0,0
 EAGB,Investec East Asian Growth Basket,Financials,Structured Products,2026-09-07,0,0
 INVP,Investec Investment Trust,Financials,Asset Management & Custody Banks,2026-09-07,0,0
 NVTA,Invitae Corporation,Healthcare,Health Care Services,2026-09-07,0,0
@@ -417,10 +409,9 @@ JOBY,Joby Aviation Inc.,Industrials,Aerospace & Defense,2026-09-07,0,0
 JNJ,Johnson & Johnson,Healthcare,Pharmaceuticals,2026-09-07,0,0
 JCI,Johnson Controls International plc,Industrials,Building Products,2026-09-07,0,0
 JPM,JPMorgan Chase & Co.,Financials,Diversified Banks,2026-09-07,0,0
-JEQI,JPMorgan Nasdaq Equity Premium Income ETF,Financials,Exchange Traded Funds,2026-09-07,0,0
 KSPI,JSC Kaspi.kz,Financials,Transaction & Payment Processing Services,2026-09-07,0,0
 JMIA,Jumia Technologies AG,Consumer Discretionary,Broadline Retail,2026-09-07,0,0
-KAR,Karman Holdings Inc.,Industrials,Aerospace & Defense,2026-09-07,0,0
+KRMN,Karman Holdings Inc.,Industrials,Aerospace & Defense,2026-09-07,0,0
 KARO,Karooooo Ltd.,Information Technology,Application Software,2026-09-07,0,0
 TOON,Kartoon Studios Inc.,Communication Services,Movies & Entertainment,2026-09-07,0,0
 K,Kellanova,Consumer Staples,Packaged Foods & Meats,2026-09-07,0,0
@@ -446,7 +437,7 @@ LBTYA,Liberty Global Ltd. Class A,Communication Services,Cable & Satellite,2026-
 LBTYK,Liberty Global Ltd. Class C,Communication Services,Cable & Satellite,2026-09-07,0,0
 LILM,Lilium N.V.,Industrials,Aerospace & Defense,2026-09-07,0,0
 LIN,Linde plc,Materials,Industrial Gases,2026-09-07,0,0
-LAAC,Lithium Americas (Argentina) Corp.,Materials,Diversified Metals & Mining,2026-09-07,0,0
+LAC,Lithium Americas (Argentina) Corp.,Materials,Diversified Metals & Mining,2026-09-07,0,0
 LIT,Lithium Argentina AG,Materials,Diversified Metals & Mining,2026-09-07,0,0
 LYV,Live Nation Entertainment Inc.,Communication Services,Movies & Entertainment,2026-09-07,0,0
 LOB,Live Oak Bancshares Inc.,Financials,Regional Banks,2026-09-07,0,0
@@ -504,9 +495,7 @@ NTRA,Natera Inc.,Healthcare,Health Care Services,2026-09-07,0,0
 NVTS,Navitas Semiconductor Corp.,Information Technology,Semiconductors,2026-09-07,0,0
 NCNO,nCino Inc.,Information Technology,Application Software,2026-09-07,0,0
 NBIS,Nebius Group NV Class A,Information Technology,IT Consulting & Other Services,2026-09-07,0,0
-QQQI,Neos Nasdaq 100 High Income ETF,Financials,Exchange Traded Funds,2026-09-07,0,0
 NTES,NetEase Inc.,Communication Services,Interactive Home Entertainment,2026-09-07,0,0
-NFLX,Netflix Inc.,Communication Services,Movies & Entertainment,2026-09-07,0,0
 NTGR,NETGEAR Inc.,Information Technology,Communications Equipment,2026-09-07,0,0
 EDU,New Oriental Education & Technology Group Inc.,Consumer Discretionary,Education Services,2026-09-07,0,0
 NEWR,New Relic Inc.,Information Technology,Application Software,2026-09-07,0,0
@@ -540,7 +529,6 @@ ON,ON Semiconductor Corporation,Information Technology,Semiconductors,2026-09-07
 ONDS,Ondas Holdings Inc.,Information Technology,Communications Equipment,2026-09-07,0,0
 OKE,ONEOK Inc.,Energy,Oil & Gas Storage & Transportation,2026-09-07,0,0
 OPEN,Opendoor Technologies Inc.,Real Estate,Real Estate Services,2026-09-07,0,0
-OIGBL,Optimal Investment Growth Basket Limited,Financials,Exchange Traded Funds,2026-09-07,0,0
 ORCL,Oracle Corporation,Information Technology,Application Software,2026-09-07,0,0
 ORLY,O'Reilly Automotive Inc.,Consumer Discretionary,Automotive Retail,2026-09-07,0,0
 OGN,Organon & Co.,Healthcare,Pharmaceuticals,2026-09-07,0,0
@@ -548,7 +536,6 @@ ONL,Orion Office REIT Inc.,Real Estate,Office REITs,2026-09-07,0,0
 OSCR,Oscar Health Inc.,Healthcare,Managed Health Care,2026-09-07,0,0
 OTIS,Otis Worldwide Corporation,Industrials,Building Products,2026-09-07,0,0
 OM,Outset Medical Inc.,Healthcare,Health Care Equipment,2026-09-07,0,0
-WAGN,Pabrai Wagons ETF,Financials,Exchange Traded Funds,2026-09-07,0,0
 PCAR,PACCAR Inc,Industrials,Construction Machinery & Heavy Transportation Equipment,2026-09-07,0,0
 PACB,Pacific Biosciences of California Inc.,Healthcare,Life Sciences Tools & Services,2026-09-07,0,0
 PLTR,Palantir Technologies Inc.,Information Technology,Application Software,2026-09-07,0,0
@@ -580,15 +567,12 @@ PPL,PPL Corporation,Utilities,Electric Utilities,2026-09-07,0,0
 PDS,Precision Drilling Corporation,Energy,Oil & Gas Drilling,2026-09-07,0,0
 PGNY,Progyny Inc.,Healthcare,Health Care Services,2026-09-07,0,0
 PLD,Prologis Inc.,Real Estate,Industrial REITs,2026-09-07,0,0
-SH,ProShares Short S&P500,Financials,Exchange Traded Funds,2026-09-07,0,0
-UXX,ProShares Ultra SpaceX,Financials,Exchange Traded Funds,2026-09-07,0,0
-VIXY,ProShares VIX Short-Term Futures ETF,Financials,Exchange Traded Funds,2026-09-07,0,0
 PRLB,Proto Labs Inc.,Industrials,Industrial Machinery,2026-09-07,0,0
 PEG,Public Service Enterprise Group Incorporated,Utilities,Multi-Utilities,2026-09-07,0,0
 PSA,Public Storage,Real Estate,Self-Storage REITs,2026-09-07,0,0
 PUBM,PubMatic Inc.,Information Technology,Application Software,2026-09-07,0,0
 PRPL,Purple Innovation Inc.,Consumer Discretionary,Home Furnishings,2026-09-07,0,0
-QNTY,Qnity Electronics Inc.,Information Technology,Electronic Equipment & Instruments,2026-09-07,0,0
+Q,Qnity Electronics Inc.,Information Technology,Electronic Equipment & Instruments,2026-09-07,0,0
 QRVO,Qorvo Inc.,Information Technology,Semiconductors,2026-09-07,0,0
 QCOM,QUALCOMM Incorporated,Information Technology,Semiconductors,2026-09-07,0,0
 PWR,Quanta Services Inc.,Industrials,Construction & Engineering,2026-09-07,0,0
@@ -621,8 +605,6 @@ ROK,Rockwell Automation Inc.,Industrials,Electrical Components & Equipment,2026-
 ROKU,Roku Inc.,Communication Services,Movies & Entertainment,2026-09-07,0,0
 ROP,Roper Technologies Inc.,Information Technology,Application Software,2026-09-07,0,0
 ROST,Ross Stores Inc.,Consumer Discretionary,Apparel Retail,2026-09-07,0,0
-QDTE,Roundhill Innovation-100 0DTE Covered Call Strategy ETF,Financials,Exchange Traded Funds,2026-09-07,0,0
-MEMX,Roundhill Memory ETF,Financials,Exchange Traded Funds,2026-09-07,0,0
 RCL,Royal Caribbean Cruises Ltd.,Consumer Discretionary,Hotels Resorts & Cruise Lines,2026-09-07,0,0
 RTX,RTX Corporation,Industrials,Aerospace & Defense,2026-09-07,0,0
 RBRK,Rubrik Inc.,Information Technology,Systems Software,2026-09-07,0,0
@@ -657,7 +639,7 @@ SSTK,Shutterstock Inc.,Communication Services,Interactive Media & Services,2026-
 SBSW,Sibanye Stillwater Limited,Materials,Precious Metals & Minerals,2026-09-07,0,0
 SPG,Simon Property Group Inc.,Real Estate,Retail REITs,2026-09-07,0,0
 SIRI,Sirius XM Holdings Inc.,Communication Services,Broadcasting,2026-09-07,0,0
-HXSCF,SK hynix Inc.,Information Technology,Semiconductors,2026-09-07,0,0
+SKHY,SK hynix Inc.,Information Technology,Semiconductors,2026-09-07,0,0
 SKY,Skyline Champion Corporation,Consumer Discretionary,Homebuilding,2026-09-07,0,0
 SWKS,Skyworks Solutions Inc.,Information Technology,Semiconductors,2026-09-07,0,0
 SMAR,Smartsheet Inc.,Information Technology,Application Software,2026-09-07,0,0
@@ -666,10 +648,10 @@ SNDL,SNDL Inc.,Healthcare,Pharmaceuticals,2026-09-07,0,0
 SNOW,Snowflake Inc.,Information Technology,Application Software,2026-09-07,0,0
 SQM,Sociedad Química y Minera de Chile S.A.,Materials,Fertilizers & Agricultural Chemicals,2026-09-07,0,0
 SOFI,SoFi Technologies Inc.,Financials,Consumer Finance,2026-09-07,0,0
-SOLAI,SOLAI Limited,Information Technology,Application Software,2026-09-07,0,0
+SLAIY,SOLAI Limited,Information Technology,Application Software,2026-09-07,0,0
 SEDG,SolarEdge Technologies Inc.,Information Technology,Semiconductors,2026-09-07,0,0
 SLDP,Solid Power Inc.,Consumer Discretionary,Automotive Parts & Equipment,2026-09-07,0,0
-SOL,Solstice Advanced Materials Inc.,Materials,Specialty Chemicals,2026-09-07,0,0
+SOLS,Solstice Advanced Materials Inc.,Materials,Specialty Chemicals,2026-09-07,0,0
 SOLV,Solventum Corp.,Healthcare,Health Care Equipment,2026-09-07,0,0
 SONO,Sonos Inc.,Consumer Discretionary,Consumer Electronics,2026-09-07,0,0
 SONY,Sony Group Corporation,Consumer Discretionary,Consumer Electronics,2026-09-07,0,0
@@ -677,7 +659,7 @@ SOS,SOS Limited,Financials,Financial Exchanges & Data,2026-09-07,0,0
 SOUN,SoundHound AI Inc.,Information Technology,Application Software,2026-09-07,0,0
 SCCO,Southern Copper Corporation,Materials,Copper,2026-09-07,0,0
 LUV,Southwest Airlines Co.,Industrials,Passenger Airlines,2026-09-07,0,0
-SPACE,SpaceX,Industrials,Aerospace & Defense,2026-09-07,0,0
+SPCX,SpaceX,Industrials,Aerospace & Defense,2026-09-07,0,0
 SPR,Spirit AeroSystems Holdings Inc.,Industrials,Aerospace & Defense,2026-09-07,0,0
 SPLK,Splunk Inc.,Information Technology,Systems Software,2026-09-07,0,0
 SRAD,Sportradar Group AG,Consumer Discretionary,Casinos & Gaming,2026-09-07,0,0
@@ -694,7 +676,6 @@ SFIX,Stitch Fix Inc.,Consumer Discretionary,Apparel Retail,2026-09-07,0,0
 STM,STMicroelectronics N.V.,Information Technology,Semiconductors,2026-09-07,0,0
 STNE,StoneCo Ltd.,Financials,Transaction & Payment Processing Services,2026-09-07,0,0
 SSYS,Stratasys Ltd.,Information Technology,Technology Hardware Storage & Peripherals,2026-09-07,0,0
-STRC,Strategy Variable Rate Perpetual Stretch Preferred Shares,Financials,Exchange Traded Funds,2026-09-07,0,0
 LRN,Stride Inc.,Consumer Discretionary,Specialized Consumer Services,2026-09-07,0,0
 SYK,Stryker Corporation,Healthcare,Health Care Equipment,2026-09-07,0,0
 SU,Suncor Energy Inc.,Energy,Integrated Oil & Gas,2026-09-07,0,0
@@ -732,27 +713,19 @@ THC,Tenet Healthcare Corporation,Healthcare,Health Care Facilities,2026-09-07,0,
 TER,Teradyne Inc.,Information Technology,Semiconductor Equipment,2026-09-07,0,0
 TSLA,Tesla Inc.,Consumer Discretionary,Automobile Manufacturers,2026-09-07,0,0
 TXN,Texas Instruments Incorporated,Information Technology,Semiconductors,2026-09-07,0,0
-BK,The Bank of New York Mellon Corporation,Financials,Asset Management & Custody Banks,2026-09-07,0,0
+BNY,The Bank of New York Mellon Corporation,Financials,Asset Management & Custody Banks,2026-09-07,0,0
 BA,The Boeing Company,Industrials,Aerospace & Defense,2026-09-07,0,0
 SAM,The Boston Beer Company Inc.,Consumer Staples,Brewers,2026-09-07,0,0
 SCHW,The Charles Schwab Corporation,Financials,Investment Banking & Brokerage,2026-09-07,0,0
 CI,The Cigna Group,Healthcare,Health Care Services,2026-09-07,0,0
 KO,The Coca-Cola Company,Consumer Staples,Soft Drinks & Non-alcoholic Beverages,2026-09-07,0,0
-SPCX,The Defiance Daily 2X Space ETF,Financials,Exchange Traded Funds,2026-09-07,0,0
-SPXU,The Defiance Daily Target 2X Long SPCX ETF,Financials,Exchange Traded Funds,2026-09-07,0,0
-SXYZ,The Defiance Daily Target 2X Short SPCX ETF,Financials,Exchange Traded Funds,2026-09-07,0,0
-LLAP,The Direxion Daily SpaceX Bull 2X ETF,Financials,Exchange Traded Funds,2026-09-07,0,0
-XOVR,The ERShares Private-Public Crossover ETF,Financials,Exchange Traded Funds,2026-09-07,0,0
 EL,The Estée Lauder Companies Inc.,Consumer Staples,Personal Care Products,2026-09-07,0,0
 GEO,The GEO Group Inc.,Industrials,Diversified Support Services,2026-09-07,0,0
 GS,The Goldman Sachs Group Inc.,Financials,Investment Banking & Brokerage,2026-09-07,0,0
-SPXX,The GraniteShares 2x Long SpaceX Daily ETF,Financials,Exchange Traded Funds,2026-09-07,0,0
-XSPC,The GraniteShares 2x Short SpaceX Daily ETF,Financials,Exchange Traded Funds,2026-09-07,0,0
 HSY,The Hershey Company,Consumer Staples,Packaged Foods & Meats,2026-09-07,0,0
 HD,The Home Depot Inc.,Consumer Discretionary,Home Improvement Retail,2026-09-07,0,0
 HNST,The Honest Company Inc.,Consumer Staples,Personal Care Products,2026-09-07,0,0
 KHC,The Kraft Heinz Company,Consumer Staples,Packaged Foods & Meats,2026-09-07,0,0
-KOID,The KraneShares Global Humanoid and Embodied Intelligence Index ETF,Financials,Exchange Traded Funds,2026-09-07,0,0
 KR,The Kroger Co.,Consumer Staples,Food Retail,2026-09-07,0,0
 MOS,The Mosaic Company,Materials,Fertilizers & Agricultural Chemicals,2026-09-07,0,0
 NYT,The New York Times Company,Communication Services,Publishing,2026-09-07,0,0
@@ -761,11 +734,9 @@ PG,The Procter & Gamble Company,Consumer Staples,Household Products,2026-09-07,0
 PGR,The Progressive Corporation,Financials,Property & Casualty Insurance,2026-09-07,0,0
 SHW,The Sherwin-Williams Company,Materials,Specialty Chemicals,2026-09-07,0,0
 SO,The Southern Company,Utilities,Electric Utilities,2026-09-07,0,0
-IEMA,The Tema Space Innovators ETF,Financials,Exchange Traded Funds,2026-09-07,0,0
 TJX,The TJX Companies Inc.,Consumer Discretionary,Apparel Retail,2026-09-07,0,0
 TTC,The Toro Company,Industrials,Agricultural & Farm Machinery,2026-09-07,0,0
 TTD,The Trade Desk Inc.,Communication Services,Advertising,2026-09-07,0,0
-SPXD,The Tradr 2X Short SpaceX Daily ETF,Financials,Exchange Traded Funds,2026-09-07,0,0
 TRV,The Travelers Companies Inc.,Financials,Property & Casualty Insurance,2026-09-07,0,0
 DIS,The Walt Disney Company,Communication Services,Movies & Entertainment,2026-09-07,0,0
 WMB,The Williams Companies Inc.,Energy,Oil & Gas Storage & Transportation,2026-09-07,0,0
@@ -817,12 +788,8 @@ UBA,Urstadt Biddle Properties Inc.,Real Estate,Retail REITs,2026-09-07,0,0
 MTN,Vail Resorts Inc.,Consumer Discretionary,Hotels Resorts & Cruise Lines,2026-09-07,0,0
 VALE,Vale S.A.,Materials,Steel,2026-09-07,0,0
 VLO,Valero Energy Corporation,Energy,Oil & Gas Refining & Marketing,2026-09-07,0,0
-VANECK,VanEck,Financials,Exchange Traded Funds,2026-09-07,0,0
-VIOG,Vanguard Developed Markets ex-US Growth Index ETF,Financials,Exchange Traded Funds,2026-09-07,0,0
-VIV,Vanguard Developed Markets ex-US Value Index ETF,Financials,Exchange Traded Funds,2026-09-07,0,0
-VYMI,Vanguard International High Dividend Yield ETF,Financials,Exchange Traded Funds,2026-09-07,0,0
 VEEV,Veeva Systems Inc.,Healthcare,Health Care Technology,2026-09-07,0,0
-VLD,Velo3D Inc.,Industrials,Industrial Machinery,2026-09-07,0,0
+VELO,Velo3D Inc.,Industrials,Industrial Machinery,2026-09-07,0,0
 VLTO,Veralto Corporation,Industrials,Industrial Machinery,2026-09-07,0,0
 VCEL,Vericel Corporation,Healthcare,Biotechnology,2026-09-07,0,0
 VRSK,Verisk Analytics Inc.,Industrials,Research & Consulting Services,2026-09-07,0,0
