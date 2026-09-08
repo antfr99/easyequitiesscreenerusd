@@ -535,7 +535,7 @@ def main() -> None:
         else:
             st.caption(
                 "Not affiliated with, endorsed by, or connected to EasyEquities — "
-                "a personal hobby project."
+                "a personal hobby project. - Ticker List last updated 8th September 2026"
             )
 
     # Only genuinely unparseable rows get a warning the user should act on.
