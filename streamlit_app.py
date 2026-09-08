@@ -40,6 +40,12 @@ st.set_page_config(
 
 CHANGE_COLS = ["% 1d", "% 1w", "% 4w", "% 13w", "% 26w", "% 52w"]
 
+# Force on-demand mode: ignore any committed snapshot and never auto-load.
+# The app starts with the bare universe (no prices, no network call); prices
+# load only when the user clicks the sidebar run button. Set to False to go
+# back to preferring data/snapshot.parquet.
+USE_ON_DEMAND_ONLY = True
+
 
 # --------------------------------------------------------------------------
 # Data loading (two-tier cache: resource for the session, data for frames)
@@ -74,7 +80,7 @@ def load_data(csv_path: Path) -> tuple[pd.DataFrame, str, list[str], list[str]]:
     on every visit sits on a shared IP that Yahoo throttles, so the page
     would hang before rendering. On-demand loading keeps first paint instant.
     """
-    if SNAPSHOT.exists():
+    if not USE_ON_DEMAND_ONLY and SNAPSHOT.exists():
         df = get_snapshot(str(SNAPSHOT), SNAPSHOT.stat().st_mtime)
         stamp = "unknown"
         errors: list[str] = []
@@ -514,14 +520,14 @@ def main() -> None:
 
     # When there is no snapshot, prices load on demand via the sidebar
     # Sector filter (see sidebar_filters). Show a short banner explaining that.
-    no_snapshot = not SNAPSHOT.exists()
+    no_snapshot = USE_ON_DEMAND_ONLY or not SNAPSHOT.exists()
 
     if no_snapshot:
         loaded_symbols = st.session_state.get("loaded_symbols", [])
         if not loaded_symbols:
             st.info(
-                "No daily snapshot yet, so prices load on demand. Pick a sector "
-                "and/or industry in the left sidebar and load them — they accumulate. "
+                "Prices load on demand. Pick a sector and/or industry in the left "
+                "sidebar, then click the load button — selections accumulate. "
                 "This is a personal hobby project and is **not affiliated with, "
                 "endorsed by, or connected to EasyEquities** in any way.",
                 icon="⏳",
