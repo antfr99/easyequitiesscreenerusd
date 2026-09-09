@@ -41,124 +41,10 @@ st.set_page_config(
 CHANGE_COLS = ["% 1d", "% 1w", "% 4w", "% 13w", "% 26w", "% 52w"]
 
 # Force on-demand mode: ignore any committed snapshot and never auto-load.
+# The app starts with the bare universe (no prices, no network call); prices
+# load only when the user clicks the sidebar run button. Set to False to go
+# back to preferring data/snapshot.parquet.
 USE_ON_DEMAND_ONLY = True
-
-# --------------------------------------------------------------------------
-# Global dark-theme CSS
-# --------------------------------------------------------------------------
-
-_DARK_CSS = """
-<style>
-/* ── Sidebar labels and text ── */
-section[data-testid="stSidebar"] label,
-section[data-testid="stSidebar"] .stMarkdown p,
-section[data-testid="stSidebar"] .stCaption,
-section[data-testid="stSidebar"] span,
-section[data-testid="stSidebar"] div[data-testid="stText"] {
-    color: #ffffff !important;
-}
-
-/* ── Sidebar header ── */
-section[data-testid="stSidebar"] h2 {
-    color: #ffffff !important;
-}
-
-/* ── Multiselect tags (chosen sectors/industries) ── */
-span[data-baseweb="tag"] {
-    background-color: #1e3a5f !important;
-    color: #ffffff !important;
-}
-span[data-baseweb="tag"] span {
-    color: #ffffff !important;
-}
-
-/* ── Multiselect input text and placeholder ── */
-div[data-baseweb="select"] input,
-div[data-baseweb="select"] div[data-testid="stSelectboxValue"],
-div[data-baseweb="select"] span {
-    color: #ffffff !important;
-}
-
-/* ── Dropdown option list ── */
-ul[data-testid="stSelectboxVirtualDropdown"] li,
-ul[role="listbox"] li {
-    color: #ffffff !important;
-    background-color: #1a1f2e !important;
-}
-ul[role="listbox"] li:hover {
-    background-color: #2a3550 !important;
-}
-
-/* ── Slider labels and values ── */
-div[data-testid="stSlider"] label,
-div[data-testid="stSlider"] p,
-div[data-testid="stSlider"] span {
-    color: #ffffff !important;
-}
-
-/* ── Radio buttons ── */
-div[data-testid="stRadio"] label,
-div[data-testid="stRadio"] span {
-    color: #ffffff !important;
-}
-
-/* ── Checkboxes ── */
-div[data-testid="stCheckbox"] label,
-div[data-testid="stCheckbox"] span {
-    color: #ffffff !important;
-}
-
-/* ── Number input ── */
-div[data-testid="stNumberInput"] label {
-    color: #ffffff !important;
-}
-
-/* ── Selectbox (performance window) ── */
-div[data-testid="stSelectbox"] label {
-    color: #ffffff !important;
-}
-
-/* ── Captions everywhere ── */
-div[data-testid="stCaptionContainer"] p,
-small, .stCaption {
-    color: #b0b8c8 !important;
-}
-
-/* ── Run button (light blue on dark) ── */
-div[class*="st-key-filter_scope_btn"] button {
-    background-color: #1e3a5f !important;
-    color: #7ec8f4 !important;
-    border: 1px solid #4a9edd !important;
-}
-div[class*="st-key-filter_scope_btn"] button:hover {
-    background-color: #254a7a !important;
-    color: #ffffff !important;
-    border-color: #7ec8f4 !important;
-}
-div[class*="st-key-filter_scope_btn"] button:active {
-    background-color: #2d5a92 !important;
-}
-
-/* ── Metric labels and values ── */
-div[data-testid="stMetric"] label,
-div[data-testid="stMetric"] div {
-    color: #ffffff !important;
-}
-
-/* ── Tab labels ── */
-button[data-baseweb="tab"] {
-    color: #b0b8c8 !important;
-}
-button[data-baseweb="tab"][aria-selected="true"] {
-    color: #ffffff !important;
-}
-
-/* ── Info/warning banners ── */
-div[data-testid="stAlert"] p {
-    color: #ffffff !important;
-}
-</style>
-"""
 
 
 # --------------------------------------------------------------------------
@@ -179,6 +65,21 @@ def get_snapshot(path: str, mtime: float) -> pd.DataFrame:
 
 
 def load_data(csv_path: Path) -> tuple[pd.DataFrame, str, list[str], list[str]]:
+    """
+    Returns (frame, source_label, errors, notes).
+
+    Order of preference:
+      1. A pre-built snapshot (data/snapshot.parquet) — instant, no Yahoo call.
+      2. A live pull the user has already triggered this session (kept in
+         st.session_state so it survives reruns from filtering).
+      3. The bare universe with empty price columns — instant, so the page
+         always renders. Prices then load only when the user clicks the
+         button, never automatically at page load.
+
+    This matters most on Streamlit Cloud: an automatic 863-ticker download
+    on every visit sits on a shared IP that Yahoo throttles, so the page
+    would hang before rendering. On-demand loading keeps first paint instant.
+    """
     if not USE_ON_DEMAND_ONLY and SNAPSHOT.exists():
         df = get_snapshot(str(SNAPSHOT), SNAPSHOT.stat().st_mtime)
         stamp = "unknown"
@@ -194,6 +95,7 @@ def load_data(csv_path: Path) -> tuple[pd.DataFrame, str, list[str], list[str]]:
                 pass
         return df, f"Snapshot built {stamp}", errors, notes
 
+    # A live pull the user triggered earlier this session.
     if "live_df" in st.session_state:
         return (
             st.session_state["live_df"],
@@ -202,6 +104,7 @@ def load_data(csv_path: Path) -> tuple[pd.DataFrame, str, list[str], list[str]]:
             st.session_state.get("live_notes", []),
         )
 
+    # Default: universe only, no prices, no network call.
     universe, errors, notes = core.load_universe(str(csv_path))
     for col in core.EMPTY_METRIC_COLUMNS:
         universe[col] = np.nan
@@ -246,6 +149,16 @@ def ticker_column_config() -> dict:
 # --------------------------------------------------------------------------
 
 def _load_scope(csv_path: Path, scope: pd.DataFrame, base: pd.DataFrame) -> None:
+    """
+    Download prices for exactly the tickers in `scope` and merge into base.
+
+    `scope` is whatever the sidebar's current Sector/Industry selection
+    resolves to — it may be a whole sector or a single industry within it.
+    Loading only ever fetches this exact set, never a wider one; which
+    tickers have been fetched is tracked at the symbol level (not by
+    sector), so picking a narrower Industry after a broader Sector never
+    re-downloads more than the gap.
+    """
     universe_all, _errors, _notes = core.load_universe(str(csv_path))
     symbols = scope["Symbol"].tolist()
     with st.spinner(f"Downloading {len(symbols)} ticker(s)…"):
@@ -267,14 +180,30 @@ def _load_scope(csv_path: Path, scope: pd.DataFrame, base: pd.DataFrame) -> None
     st.rerun()
 
 
+_FILTER_BUTTON_CSS = """
+<style>
+div[class*="st-key-filter_scope_btn"] button {
+    background-color: #cfe8fb;
+    color: #0b4f79;
+    border: 1px solid #9cc9e8;
+}
+div[class*="st-key-filter_scope_btn"] button:hover {
+    background-color: #b8ddf6;
+    color: #0b4f79;
+    border-color: #7fb3d5;
+}
+div[class*="st-key-filter_scope_btn"] button:active {
+    background-color: #a5d2f2;
+}
+</style>
+"""
+
+
 def sidebar_filters(
     df: pd.DataFrame,
     csv_path: Path | None = None,
     no_snapshot: bool = False,
 ) -> tuple[pd.DataFrame, str | None]:
-    # Inject dark CSS once, at the top of the sidebar render pass
-    st.sidebar.markdown(_DARK_CSS, unsafe_allow_html=True)
-
     st.sidebar.header("Filters")
 
     search = st.sidebar.text_input("Search ticker or company", placeholder="e.g. AEHR")
@@ -282,10 +211,14 @@ def sidebar_filters(
     sectors = sorted(df["Sector"].dropna().unique())
     chosen_sectors = st.sidebar.multiselect("Sector", sectors, default=[])
 
+    # Industry list is scoped to the chosen sector(s): pick Financials and
+    # only Financials industries appear. With no sector chosen, all show.
     scoped = df[df["Sector"].isin(chosen_sectors)] if chosen_sectors else df
     industries = sorted(scoped["Industry"].dropna().unique())
     chosen_industries = st.sidebar.multiselect("Industry", industries, default=[])
 
+    # Loading lives below both pickers and respects both: selecting an
+    # Industry narrows the download to that industry, not the whole sector.
     if no_snapshot and csv_path is not None:
         loaded_symbols = set(st.session_state.get("loaded_symbols", []))
         current_scope = df
@@ -296,6 +229,7 @@ def sidebar_filters(
 
         if chosen_sectors or chosen_industries:
             to_load = current_scope[~current_scope["Symbol"].isin(loaded_symbols)]
+            st.sidebar.markdown(_FILTER_BUTTON_CSS, unsafe_allow_html=True)
             if len(to_load) > 0:
                 if st.sidebar.button(
                     "Run",
@@ -318,6 +252,8 @@ def sidebar_filters(
     has_prices = bool(available_change_cols) and df["Close"].notna().any()
 
     if not has_prices:
+        # No price data yet — sector/industry/search still work; skip the
+        # performance and price filters that would have nothing to act on.
         out = df.copy()
         if search.strip():
             q = search.strip().lower()
@@ -340,6 +276,7 @@ def sidebar_filters(
         help="Drives the sliders below and the sector / industry rankings.",
     )
 
+    # Performance range
     series = df[change_col].replace([np.inf, -np.inf], np.nan).dropna()
     if not series.empty:
         lo = float(np.floor(max(series.min(), -100)))
@@ -354,6 +291,7 @@ def sidebar_filters(
     else:
         perf_range = None
 
+    # Price range
     prices = df["Close"].dropna()
     if not prices.empty:
         price_range = st.sidebar.slider(
@@ -392,6 +330,7 @@ def sidebar_filters(
         else False
     )
 
+    # ----- apply -----
     out = df.copy()
 
     if search.strip():
@@ -579,6 +518,8 @@ def main() -> None:
         st.error("The loaded data has no price columns. Rebuild the snapshot.")
         st.stop()
 
+    # When there is no snapshot, prices load on demand via the sidebar
+    # Sector filter (see sidebar_filters). Show a short banner explaining that.
     no_snapshot = USE_ON_DEMAND_ONLY or not SNAPSHOT.exists()
 
     if no_snapshot:
@@ -597,6 +538,7 @@ def main() -> None:
                 "a personal hobby project."
             )
 
+    # Only genuinely unparseable rows get a warning the user should act on.
     if csv_errors:
         with st.expander(f"⚠️ {len(csv_errors)} row(s) couldn't be read", expanded=False):
             st.caption(
@@ -606,6 +548,7 @@ def main() -> None:
             for w in csv_errors:
                 st.write("•", w)
 
+    # Duplicates and other housekeeping are informational, not problems.
     if csv_notes:
         st.caption(" · ".join(csv_notes))
 
