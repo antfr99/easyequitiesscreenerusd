@@ -527,9 +527,9 @@ def main() -> None:
         if not loaded_symbols:
             st.info(
                 "Prices load on demand. Pick a sector and/or industry in the left "
-                "sidebar, then click the load button — if you select all then be patient as it could take a few minutes. "
+                "sidebar, then click the load button — should you Select All in the filter then please be patient as it could take a few minutes to load the data. "
                 "This is a personal hobby project and is **not affiliated with, "
-                "endorsed by, or connected to EasyEquities** in any way. - Ticker List last updated 8th September 2026",
+                "endorsed by, or connected to EasyEquities** in any way. - Ticker List last updated 9th September 2026",
                 icon="⏳",
             )
         else:
